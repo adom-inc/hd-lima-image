@@ -318,6 +318,23 @@ if [ -x /home/adom/.local/bin/adompkg ]; then
     done
 fi
 
+# ── HD macOS skills layer (the -mac companions) via adompkg ─────────────────
+# step 8 above bakes the GENERIC hd-* skills from the repo's shared/machine
+# buckets — but the macOS-platform companions (hd-*-mac) live ONLY in the wiki
+# package adom/hd-mac-bootstrap. Install it here (after adompkg is set up) so the
+# golden image ships the SAME skill set the runtime converge (install-hd-skills)
+# delivers — incl. the -mac companions — instead of a stale repo-only subset.
+# This was the v8 gap: fresh installs imported a golden with NO -mac skills.
+# Must be ANONYMOUSLY resolvable (the bake is token-less in CI); hd-mac-bootstrap
+# + its deps are public on wiki.adom.inc. ALLOW_SUDO=1 for the needs_sudo dep.
+if [ -x /home/adom/.local/bin/adompkg ]; then
+    log "adompkg: install adom/hd-mac-bootstrap (macOS skills layer + -mac companions)"
+    as_adom "export ADOMPKG_REGISTRY=https://wiki.adom.inc; ADOMPKG_ALLOW_SUDO=1 /home/adom/.local/bin/adompkg install adom/hd-mac-bootstrap"
+    ls /home/adom/.claude/skills | grep -q -- '-mac' \
+        || { echo 'bake: hd-mac-bootstrap did not deploy any -mac skills' >&2; exit 1; }
+    log "  -mac skills present: $(ls /home/adom/.claude/skills | grep -c -- '-mac')"
+fi
+
 # ── tidy ───────────────────────────────────────────────────────────────────
 # install.mjs leaves an empty {"mcpServers":{}} at ~/project/.mcp.json —
 # visible bake debris in a fresh user's explorer (pup visual test
