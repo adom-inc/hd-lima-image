@@ -1,14 +1,14 @@
 ---
 name: golden-image-bake
-description: Rebuild + release the Hydrogen Desktop golden Lima/nspawn rootfs image (adom-inc/hd-lima-image). Use when the user says "bake the golden image", "rebuild the lima image", "new golden image", "monthly image bake", "cut a new hd-lima-image version", or when gallia/CLI/extension drift makes the shipped image stale (target cadence: monthly). EMPLOYEE-ONLY — needs an Adom cloud container with the private gallia + hydrogen-desktop checkouts; never publish this skill to gallia or the public image.
+description: Rebuild + release the Hydrogen Desktop golden Lima/nspawn rootfs image (adom-inc/hd-lima-image). Use when the user says "bake the golden image", "rebuild the lima image", "new golden image", "monthly image bake", "cut a new hd-lima-image version", or when CLI/extension/skill drift makes the shipped image stale (target cadence: monthly). EMPLOYEE-ONLY — needs an Adom cloud container with the private hydrogen-desktop checkout; never publish this skill to the public image.
 ---
 
 # Golden image bake — adom-inc/hd-lima-image
 
 Rebuilds the flat arm64 Rosetta-hybrid rootfs that Hydrogen Desktop `machinectl import-tar`s, with
-everything pre-baked (apt baseline, code-server, gallia, claude CLI,
-Claude Code + adom-vscode extensions, VS Code settings, HD skills, Adom
-CLIs, adom-desktop CLI), then publishes it as a GitHub Release asset.
+everything pre-baked (apt baseline, code-server, claude CLI,
+Claude Code + adom-vscode extensions, VS Code settings, HD skills, adompkg +
+adompkg-managed adom skills, Adom CLIs, adom-desktop CLI), then publishes it as a GitHub Release asset.
 
 Repo: `/home/adom/project/hd-lima-image` (github.com/adom-inc/hd-lima-image, public).
 Canonical recipe: `image/Dockerfile`; the chroot builder
@@ -38,7 +38,7 @@ an existing user's machine. All ongoing updates flow through the daemon in
 place; the image only benefits brand-new installs.
 
 **KEEP everything currently baked** (code-server, claude-code extension,
-adom-vscode, gallia, CLIs — all of it stays). The daemon does NOT replace
+adom-vscode, adompkg + adom skills, CLIs — all of it stays). The daemon does NOT replace
 the bake. Its **first** update installs the **Codex VS Code extension**
 (which we do NOT bake) and thereafter converges the container to the live
 manifest (SHA-verified, never-downgrade, surgical):
@@ -76,7 +76,6 @@ Implementation (apply when the gate opens), in lockstep across all three:
 
 ## Preconditions
 
-- `~/gallia` exists and is freshly pulled (`cd ~/gallia && git pull --ff-only`)
 - `~/project/hydrogen-desktop` exists (HD skills source; pull main for releases)
 - ~8 GB free under `/tmp` (`df -h /tmp`)
 - No other bake running (`pgrep -f build-rootfs.sh` — shared `/tmp/hd-golden-build` workdir)
@@ -91,7 +90,7 @@ gh release list --repo adom-inc/hd-lima-image     # pick next vN
 gh workflow run build-golden-image -f version=vN
 gh run watch $(gh run list --workflow build-golden-image --limit 1 --json databaseId -q '.[0].databaseId') --exit-status
 # CI does build + smoke + release + ghcr push. Then SKIP to step 5 (verify).
-# Needs the GALLIA_TOKEN repo secret (read access to gallia + hydrogen-desktop).
+# Needs the HD_REPO_TOKEN repo secret (read access to hydrogen-desktop).
 ```
 
 **Fallback path — local chroot build** (CI down, or iterating on the recipe):
@@ -160,7 +159,7 @@ bumps the pins (existing installs migrate via `migrate_to_new_tarball`).
 ## Invariants (smoke-tested; never regress)
 
 - **Public build**: nothing in the image requires GitHub auth. No
-  `gallia/.git`, no gallia stale-detector hook (`check-updates.sh`) in
+  stale-detector hook (`check-updates.sh`) in
   `~/.claude/settings.json` — `image/public-scrub.sh` enforces this.
 - **No model pins**: neither `~/.claude/settings.json` (`model`) nor
   code-server `settings.json` (`claudeCode.selectedModel`) names a model —

@@ -17,7 +17,7 @@ ship as new image versions (monthly bake), not git pulls.
 | Ubuntu 24.04 (arm64) apt baseline (build-essential, cmake, node, python3, gh, …) | `machinectl import-tar` + code-server start (step 1–2) |
 | **x86-64 multiarch glibc** (`dpkg --add-architecture amd64`) so Rosetta can run x86-64 Adom binaries | Rosetta itself (provided by the Lima `vz` VM, not baked) |
 | code-server (pinned) + **dark-mode settings.json + trusted-domains patch** (step 7) | layout hides via :8821 (browser-state half of step 7) |
-| **gallia** snapshot at `~/gallia` (no .git) + full `install.mjs` deploy: skills, hooks, permissions (step 4) | `set-env-vars` — live proxy port (step 5) |
+| **adom skills** via adompkg (`adompkg install adom/hd-mac-bootstrap` et al.) | `set-env-vars` — live proxy port (step 5) |
 | **claude CLI** at `~/.local/bin/claude` + PATH (step 15) | `inject-api-key` — Adom session token (step 6) |
 | **Claude Code extension** from Open VSX (step 16) | relay start + tests (steps 9, 11–14) |
 | **adom-vscode binary + extension** registered with code-server (step 3) | `claude-auth` — user OAuth (step 17) |
@@ -27,9 +27,8 @@ ship as new image versions (monthly bake), not git pulls.
 | `adom` user 1001 + sudoers + systemd linger (systemd-nspawn boots systemd as PID1) | |
 
 **Public-build invariants** (smoke-tested, see `image/public-scrub.sh`):
-no `gallia/.git`, no gallia stale-detector update hook, no GitHub-auth
-dependency anywhere, and **no model pins** — Claude Code picks the
-default model itself.
+no stale-detector update hook, no GitHub-auth dependency anywhere, and
+**no model pins** — Claude Code picks the default model itself.
 
 ## Build & release
 

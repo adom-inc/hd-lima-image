@@ -11,7 +11,6 @@
 # same toolchain — so any binary built in the cloud container runs here.
 #
 # NOT baked (by design):
-#   - gallia (private repo; changes daily) — first-run/update concern
 #   - per-user state (Carbon API key, wiki token, agents) — per-machine
 #   - adom-host (+ host.docker.internal) alias — written per machine-start by init-host-internal.sh
 
@@ -109,13 +108,8 @@ COPY bootstrap.sh /opt/adom/bootstrap.sh
 RUN chmod +x /etc/init-host-internal.sh /opt/adom/bootstrap.sh \
     && chown -R adom:adom /opt/adom
 
-# gallia + HD skills, staged into the build context by CI:
-#   gallia/    — adom-inc/gallia working tree, .git ALREADY STRIPPED (the
-#                public image must not carry the private remote or require
-#                GitHub auth; scripts/build-rootfs.sh tars the local clone
-#                with --exclude=.git instead)
+# HD skills, staged into the build context by CI:
 #   hd-skills/ — hydrogen-desktop/skills/public-facing/{shared,machine}
-COPY --chown=adom:adom gallia /home/adom/gallia
 COPY hd-skills /tmp/hd-skills
 # workspace-updater daemon (HD auto-update Part B). CI always creates this dir;
 # it's populated only once feature/hd-auto-update is on main. bake-hd-setup.sh
@@ -124,13 +118,12 @@ COPY workspace-updater /tmp/workspace-updater
 # adompkg (the Adom package manager) — prerequisite for the adompkg-managed model.
 COPY adompkg /tmp/adompkg
 
-# bake-hd-setup.sh pre-runs HD's setup cascade (gallia npm + install.mjs,
-# claude CLI, Claude Code + adom-vscode extensions, VS Code settings +
-# trusted domains, HD skills, adom-desktop CLI) — shared verbatim with
-# scripts/build-rootfs.sh. public-scrub.sh then removes the gallia
-# stale-detector hook (30-min git fetch against the private repo) and
-# other GitHub-auth assumptions; updates arrive as new image versions,
-# not git pulls.
+# bake-hd-setup.sh pre-runs HD's setup cascade (claude CLI, Claude Code +
+# adom-vscode extensions, VS Code settings + trusted domains, HD skills,
+# adom-desktop CLI, adompkg-managed installs) — shared verbatim with
+# scripts/build-rootfs.sh. public-scrub.sh then removes any stale-detector
+# update hook and other GitHub-auth assumptions; updates arrive as new image
+# versions, not git pulls.
 USER root
 COPY bake-hd-setup.sh /tmp/bake-hd-setup.sh
 RUN bash /tmp/bake-hd-setup.sh && rm -f /tmp/bake-hd-setup.sh

@@ -11,10 +11,9 @@
 # and welcome.
 #
 # NOTHING here may require GitHub authentication — this image is public and
-# installs on machines with no GitHub identity. Sources used: the local
-# gallia snapshot (staged by the builder), the public Adom wiki, Open VSX,
-# and claude.ai. install.mjs's `gh release download` attempts fail
-# unauthenticated and fall back to wiki URLs by design.
+# installs on machines with no GitHub identity. Sources used: the public Adom
+# wiki, Open VSX, and claude.ai. The adom skills come from the adompkg-managed
+# installs below (adompkg install adom/hd-mac-bootstrap et al.).
 
 set -euo pipefail
 log() { echo "[bake-hd-setup] $*"; }
@@ -23,20 +22,11 @@ as_adom() { runuser -u adom -- bash -lc "$1"; }
 WIKI_BASE="${WIKI_BASE:-https://wiki-ufypy5dpx93o.adom.cloud}"
 CS=/usr/lib/code-server/bin/code-server
 
-# ── step 4: install-gallia ─────────────────────────────────────────────────
-# npm install must produce node_modules (hard gate, mirrors the cascade).
-# install.mjs is gated on its own "Installation complete" marker, NOT its
-# exit code — it exits non-zero even on a fully successful install.
-log "step 4: gallia npm install + install.mjs"
-test -d /home/adom/gallia || { echo "gallia snapshot missing — builder must stage it first" >&2; exit 1; }
-as_adom 'cd ~/gallia && npm install --no-audit --no-fund 2>&1 | tail -3 && test -d node_modules'
-as_adom 'node ~/gallia/install.mjs --project ~/project > /tmp/install-mjs.log 2>&1 || true; tail -25 /tmp/install-mjs.log; grep -q "Installation complete" /tmp/install-mjs.log'
-
 # ── step 15: install-claude-cli ────────────────────────────────────────────
 # Official installer → ~/.local/bin/claude (symlink to
-# ~/.local/share/claude/versions/<ver>). PATH line is idempotent (and
-# install.mjs §0 writes it too). The ~235 MB download cache is deleted —
-# it would otherwise ship in the image for nothing.
+# ~/.local/share/claude/versions/<ver>). PATH line is idempotent. The
+# ~235 MB download cache is deleted — it would otherwise ship in the image
+# for nothing.
 #
 # The claude binary (bun-based) REQUIRES /proc and aborts without it. In
 # docker (CI) /proc exists and the installer self-completes + verifies.
@@ -203,8 +193,8 @@ AD_URL="$(echo "$VJ" | jq -r '.cli.linux_x86_64.binary_url')"
 [ -n "$AD_URL" ] && [ "$AD_URL" != "null" ]
 curl -fsSL "$AD_URL" -o /usr/local/bin/adom-desktop
 chmod 0755 /usr/local/bin/adom-desktop
-# A stale ~/.local/bin/adom-desktop (occasionally created by older gallia
-# install.mjs runs) would shadow /usr/local/bin in PATH — remove it.
+# A stale ~/.local/bin/adom-desktop (occasionally left by older installers)
+# would shadow /usr/local/bin in PATH — remove it.
 rm -f /home/adom/.local/bin/adom-desktop
 as_adom 'adom-desktop --version'
 
@@ -266,8 +256,7 @@ systemctl enable cron.service 2>/dev/null || {
 # ── adompkg — the Adom package manager (PREREQUISITE for the whole adompkg model) ──
 # Staged at /tmp/adompkg by the builder (a 193 B bash wrapper + ~208 KB adompkg.mjs
 # ESM impl that runs on the baked node). adompkg is NOT a registry package and has
-# no self-update (its only update path is the gallia check-updates hook, which the
-# public image scrubs) — so it ships frozen here, refreshed by the monthly rebake
+# no self-update — so it ships frozen here, refreshed by the monthly rebake
 # (or, ideally, added to the workspace-updater manifest later). The workspace-updater
 # daemon's CLI-pull mode + any `adompkg install` in this image depend on this being
 # present.

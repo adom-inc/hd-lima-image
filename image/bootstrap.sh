@@ -11,8 +11,8 @@
 # Always exits 0.
 #
 # Note: as of 2026-06-11 install.mjs is NOT published at the wiki static
-# path (gallia ships it only inside the private repo). Until that changes,
-# this script logs a skip and exits — which is correct behavior, not a bug.
+# path. Until that changes, this script logs a skip and exits — which is
+# correct behavior, not a bug.
 
 set -u
 

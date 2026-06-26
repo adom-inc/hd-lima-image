@@ -3452,8 +3452,8 @@ adompkg-link-skill() {
     if [ -n "\$existing" ] && [ "\$existing" != "\$src_dir/\$rel" ]; then
       echo "WARNING: skill '\$slug' already installed from \$existing — overwriting with \$src_dir/\$rel (two packages claim the skill name '\$slug')." >&2
     fi
-    # A NON-symlink (real dir from another installer, e.g. gallia install.mjs)
-    # squatting the slug would make ln -sfn nest the link INSIDE it as
+    # A NON-symlink (real dir from another installer) squatting the
+    # slug would make ln -sfn nest the link INSIDE it as
     # <slug>/<slug>, corrupting the skill. Replace it instead.
     if [ -e "\$dest" ] && [ ! -L "\$dest" ]; then
       echo "WARNING: skill '\$slug' was a real directory (likely from another installer) — replacing with adompkg symlink." >&2
@@ -3566,7 +3566,7 @@ async function cmdDoctor() {
       detail: `failed to materialize: ${err.message}` });
   }
 
-  // 6. UserPromptSubmit hook for update checks (gallia or adom-hook).
+  // 6. UserPromptSubmit hook for update checks (adom-hook).
   const settingsPath = path.join(HOME, ".claude", "settings.json");
   if (fs.existsSync(settingsPath)) {
     try {
@@ -3581,7 +3581,7 @@ async function cmdDoctor() {
             detail: "found check-updates.sh or adom-hook in UserPromptSubmit" }
         : { name: "update-check hook wired", status: "warn",
             detail: "no update-check command in ~/.claude/settings.json UserPromptSubmit",
-            hint: "Install adom-hook ('adompkg install adom-hook') or wire gallia's hook manually." });
+            hint: "Install adom-hook ('adompkg install adom-hook') to wire the update-check hook." });
     } catch (err) {
       checks.push({ name: "update-check hook wired", status: "warn",
         detail: `couldn't parse ${settingsPath}: ${err.message}` });

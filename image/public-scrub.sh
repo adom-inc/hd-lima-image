@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
-# public-scrub.sh — run as root inside the rootfs after install.mjs.
+# public-scrub.sh — run as root inside the rootfs after the HD setup bake.
 #
 # This image ships to the public. Strip everything that phones home to
 # private infra or assumes GitHub auth:
-#   - the gallia stale-detector hook (UserPromptSubmit → check-updates.sh):
-#     a 30-min `git fetch` against the private gallia repo — pointless
-#     without .git in the snapshot and wrong for non-employee machines.
-#     Updates ship as new image versions instead.
+#   - any stale-detector update hook (UserPromptSubmit → check-updates.sh):
+#     a periodic `git fetch` against a private repo — wrong for non-employee
+#     machines. Updates ship as new image versions instead.
 #   - bake-time update stamps under ~/.adom
 #
 # Keep idempotent; both scripts/build-rootfs.sh (chroot) and

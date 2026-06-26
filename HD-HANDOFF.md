@@ -36,10 +36,10 @@ Pin all three in `hd-app/src/runtime/macos.rs` (`TARBALL_URL`, `TARBALL_SHA256`,
 ## Baked vs runtime
 
 Baked: apt baseline, x86-64 multiarch, code-server (+ dark theme, trusted-domains
-patch, chat/UI disables, no model pin), gallia + install.mjs, claude CLI, Claude
-Code + adom-vscode extensions, HD `shared`+`machine` skills, the Adom wiki CLIs,
-adom-desktop CLI, adompkg, the in-machine workspace-updater daemon + timer,
-`adom` user 1001 + sudoers + linger.
+patch, chat/UI disables, no model pin), claude CLI, Claude Code + adom-vscode
+extensions, HD `shared`+`machine` skills, the adompkg-managed adom skills
+(`adom/hd-mac-bootstrap`), the Adom wiki CLIs, adom-desktop CLI, adompkg, the
+in-machine workspace-updater daemon + timer, `adom` user 1001 + sudoers + linger.
 
 Runtime: `machinectl import-tar` + boot + code-server start, `set-env-vars` (live
 proxy port), `inject-api-key` (Carbon token), relay start + tests, `claude-auth`
