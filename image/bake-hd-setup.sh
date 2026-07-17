@@ -71,9 +71,15 @@ as_adom 'grep -q "/.local/bin" ~/.bashrc || printf "export PATH=\"\$HOME/.local/
 as_adom 'rm -rf ~/.claude/downloads'
 
 # ── step 16: install-claude-ext ────────────────────────────────────────────
-log "step 16: Claude Code extension (Open VSX)"
-as_adom "$CS --install-extension anthropic.claude-code --force 2>&1 | tail -3"
-as_adom "$CS --list-extensions 2>/dev/null | grep -qi claude"
+# PINNED, never latest: newer extension builds can be incompatible with
+# code-server's Node (2.1.179+ crash → blank Claude panel; baking latest 2.1.212
+# in v11 hung every fresh install, 2026-07-17). LOCKSTEP: this pin must match
+# CLAUDE_CODE_PIN in hydrogen-desktop setup_steps_macos.rs (the runtime
+# enforcement) — bump both together after verifying a new version renders.
+CLAUDE_EXT_PIN="2.1.177"
+log "step 16: Claude Code extension (Open VSX, pinned ${CLAUDE_EXT_PIN})"
+as_adom "$CS --install-extension anthropic.claude-code@${CLAUDE_EXT_PIN} --force 2>&1 | tail -3"
+as_adom "$CS --list-extensions --show-versions 2>/dev/null | grep -qi \"claude-code@${CLAUDE_EXT_PIN}\""
 
 # ── step 3: install-adom-vscode (extension half; binary baked earlier) ────
 # `adom-vscode install` drops the .vsix at /tmp + skill + completions but
@@ -124,8 +130,8 @@ cat > /home/adom/.local/share/code-server/User/settings.json <<'SETTINGS'
   "workbench.trustedDomains.promptInTrustedWorkspace": false,
   "remote.portsAttributes": { "8821": { "onAutoForward": "silent" } },
   "remote.otherPortsAttributes": { "onAutoForward": "silent" },
-  "extensions.autoUpdate": true,
-  "extensions.autoCheckUpdates": true
+  "extensions.autoUpdate": false,
+  "extensions.autoCheckUpdates": false
 }
 SETTINGS
 chown adom:adom /home/adom/.local/share/code-server/User/settings.json
