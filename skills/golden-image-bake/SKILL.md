@@ -7,8 +7,8 @@ description: Rebuild + release the Hydrogen Desktop golden Lima/nspawn rootfs im
 
 Rebuilds the flat arm64 Rosetta-hybrid rootfs that Hydrogen Desktop `machinectl import-tar`s, with
 everything pre-baked (apt baseline, code-server, claude CLI,
-Claude Code + adom-vscode extensions, VS Code settings, HD skills, adompkg +
-adompkg-managed adom skills, Adom CLIs, adom-desktop CLI), then publishes it as a GitHub Release asset.
+Claude Code + adom-vscode extensions, VS Code settings, HD skills, the adom-wiki CLI +
+wiki-managed adom skills, Adom CLIs, adom-desktop CLI), then publishes it as a GitHub Release asset.
 
 Repo: `/home/adom/project/hd-lima-image` (github.com/adom-inc/hd-lima-image, public).
 Canonical recipe: `image/Dockerfile`; the chroot builder
@@ -38,7 +38,7 @@ an existing user's machine. All ongoing updates flow through the daemon in
 place; the image only benefits brand-new installs.
 
 **KEEP everything currently baked** (code-server, claude-code extension,
-adom-vscode, adompkg + adom skills, CLIs — all of it stays). The daemon does NOT replace
+adom-vscode, adom-wiki + adom skills, CLIs — all of it stays). The daemon does NOT replace
 the bake. Its **first** update installs the **Codex VS Code extension**
 (which we do NOT bake) and thereafter converges the container to the live
 manifest (SHA-verified, never-downgrade, surgical):

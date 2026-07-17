@@ -156,16 +156,19 @@ else
     log "workspace-updater source absent (pre-merge) — daemon bake will skip"
 fi
 
-# adompkg (the Adom package manager) — staged for the adompkg step in
-# bake-hd-setup.sh. Snapshot lives in the repo at image/adompkg/.
-log "staging adompkg"
-sudo rm -rf "${ROOT}/tmp/adompkg"
-sudo mkdir -p "${ROOT}/tmp/adompkg"
-sudo cp image/adompkg/adompkg image/adompkg/adompkg.mjs "${ROOT}/tmp/adompkg/"
+# adom-wiki CLI (native arm64; the official wiki package manager — adompkg is
+# RETIRED) — staged for the adom-wiki step in bake-hd-setup.sh. Source: the same
+# binary hydrogen-desktop bundles (scripts/fetch-adom-wiki.sh stages it there).
+ADOM_WIKI_SRC="${ADOM_WIKI_SRC:-${HOME}/project/hydrogen-desktop/src-tauri/crates/hd-app/resources/adom-wiki/adom-wiki-linux-arm64}"
+[[ -f "${ADOM_WIKI_SRC}" ]] || { echo "adom-wiki arm64 binary not found at ${ADOM_WIKI_SRC} (set ADOM_WIKI_SRC)" >&2; exit 1; }
+log "staging adom-wiki from ${ADOM_WIKI_SRC}"
+sudo rm -rf "${ROOT}/tmp/adom-wiki"
+sudo mkdir -p "${ROOT}/tmp/adom-wiki"
+sudo cp "${ADOM_WIKI_SRC}" "${ROOT}/tmp/adom-wiki/adom-wiki"
 
 # bake-hd-setup.sh pre-runs the HD setup cascade (claude CLI, Claude Code +
 # adom-vscode extensions, VS Code settings, trusted domains, HD skills,
-# adom-desktop CLI, adompkg-managed installs) — shared with Dockerfile.
+# adom-desktop CLI, wiki-managed installs via adom-wiki) — shared with Dockerfile.
 log "bake HD setup steps"
 sudo install -m 0755 image/bake-hd-setup.sh "${ROOT}/tmp/bake-hd-setup.sh"
 in_root "bash /tmp/bake-hd-setup.sh && rm -f /tmp/bake-hd-setup.sh"
@@ -252,14 +255,17 @@ in_root "set -e; code-server --version; node --version; git --version; \
       test -f /home/adom/.claude/skills/\$s/SKILL.md || { echo \"MISSING required HD skill: \$s\"; exit 1; }; \
   done; \
   test -x /usr/local/bin/adom-desktop || { echo 'MISSING adom-desktop CLI'; exit 1; }; \
-  test -x /home/adom/.local/bin/adompkg && test -f /home/adom/.local/bin/adompkg.mjs \
-      || { echo 'MISSING adompkg (package manager)'; exit 1; }; \
-  runuser -u adom -- bash -lc 'adompkg --version' >/dev/null 2>&1 || { echo 'adompkg --version failed'; exit 1; }; \
-  grep -q 'ADOMPKG_REGISTRY=https://wiki.adom.inc' /etc/environment || { echo 'MISSING ADOMPKG_REGISTRY pin'; exit 1; }; \
+  test -x /home/adom/.local/bin/adom-wiki \
+      || { echo 'MISSING adom-wiki (official wiki CLI)'; exit 1; }; \
+  runuser -u adom -- bash -lc 'adom-wiki --version' >/dev/null 2>&1 || { echo 'adom-wiki --version failed'; exit 1; }; \
+  ! test -e /home/adom/.local/bin/adompkg || { echo 'LEAK: retired adompkg still in image'; exit 1; }; \
+  ! test -e /etc/profile.d/adompkg.sh || { echo 'LEAK: retired ADOMPKG_REGISTRY profile.d pin'; exit 1; }; \
+  ! grep -q 'ADOMPKG_REGISTRY' /etc/environment 2>/dev/null || { echo 'LEAK: ADOMPKG_REGISTRY in /etc/environment'; exit 1; }; \
   for c in adom-google; do \
-      test -e /home/adom/.local/bin/\$c || { echo \"MISSING adompkg-managed CLI: \$c\"; exit 1; }; \
+      test -e /home/adom/.local/bin/\$c || { echo \"MISSING wiki-managed CLI: \$c\"; exit 1; }; \
   done; \
-  test -f /home/adom/project/adom_modules/.installed.json || { echo 'MISSING adom_modules/.installed.json'; exit 1; }; \
+  test -d /home/adom/project/adom_modules/adom/hd-mac-bootstrap \
+      || { echo 'MISSING adom_modules payload for hd-mac-bootstrap'; exit 1; }; \
   jq -e 'has(\"model\") | not' /home/adom/.claude/settings.json >/dev/null \
       || { echo 'LEAK: settings.json pins a model'; exit 1; }; \
   jq -e '[(.hooks.UserPromptSubmit // [])[] | (.hooks // [])[] | .command // \"\"] \

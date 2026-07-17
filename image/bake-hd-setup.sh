@@ -12,8 +12,9 @@
 #
 # NOTHING here may require GitHub authentication — this image is public and
 # installs on machines with no GitHub identity. Sources used: the public Adom
-# wiki, Open VSX, and claude.ai. The adom skills come from the adompkg-managed
-# installs below (adompkg install adom/hd-mac-bootstrap et al.).
+# wiki, Open VSX, and claude.ai. The adom skills come from the adom-wiki-managed
+# installs below (adom-wiki pkg install adom/hd-mac-bootstrap et al. — adom-wiki
+# is the official wiki CLI; adompkg is RETIRED and no longer ships in the image).
 
 set -euo pipefail
 log() { echo "[bake-hd-setup] $*"; }
@@ -253,72 +254,50 @@ systemctl enable cron.service 2>/dev/null || {
               /etc/systemd/system/multi-user.target.wants/cron.service 2>/dev/null || true
 }
 
-# ── adompkg — the Adom package manager (PREREQUISITE for the whole adompkg model) ──
-# Staged at /tmp/adompkg by the builder (a 193 B bash wrapper + ~208 KB adompkg.mjs
-# ESM impl that runs on the baked node). adompkg is NOT a registry package and has
-# no self-update — so it ships frozen here, refreshed by the monthly rebake
-# (or, ideally, added to the workspace-updater manifest later). The workspace-updater
-# daemon's CLI-pull mode + any `adompkg install` in this image depend on this being
-# present.
-#
-# ⚠ adompkg's compiled-in DEFAULT registry points at the STALE legacy host. Pin the
-# canonical registry image-wide via /etc/environment (login shells) + a profile.d
-# script, so every shell AND the daemon resolve installs from wiki.adom.inc.
-if [ -f /tmp/adompkg/adompkg.mjs ]; then
-    log "adompkg (package manager) + ADOMPKG_REGISTRY pin"
+# ── adom-wiki — the official wiki CLI (successor to the RETIRED adompkg) ────
+# Staged at /tmp/adom-wiki by the builder: the NATIVE arm64 build (the same binary
+# HD bundles in the .app and installs at setup via install_adom_wiki_in_workspace),
+# so package operations in the machine run natively — no Rosetta. Installed to
+# ~/.local/bin/adom-wiki, the exact path the HD cascade converges (idempotent
+# overwrite at runtime keeps it fresh). Default registry is wiki.adom.inc — no
+# env pin needed (the ADOMPKG_REGISTRY pin died with adompkg).
+if [ -f /tmp/adom-wiki/adom-wiki ]; then
+    log "adom-wiki CLI (official wiki package manager)"
     install -d -o adom -g adom -m 0755 /home/adom/.local/bin
-    install -o adom -g adom -m 0755 /tmp/adompkg/adompkg     /home/adom/.local/bin/adompkg
-    install -o adom -g adom -m 0644 /tmp/adompkg/adompkg.mjs /home/adom/.local/bin/adompkg.mjs
-    chmod 0755 /home/adom/.local/bin/adompkg
-    rm -rf /tmp/adompkg
-    # Registry pin — canonical wiki.adom.inc, never the stale legacy host.
-    grep -q '^ADOMPKG_REGISTRY=' /etc/environment 2>/dev/null \
-        || echo 'ADOMPKG_REGISTRY=https://wiki.adom.inc' >> /etc/environment
-    printf 'export ADOMPKG_REGISTRY=https://wiki.adom.inc\n' > /etc/profile.d/adompkg.sh
-    chmod 0644 /etc/profile.d/adompkg.sh
-    log "  adompkg $(runuser -u adom -- bash -lc 'adompkg --version' 2>/dev/null) installed; registry pinned to wiki.adom.inc"
+    install -o adom -g adom -m 0755 /tmp/adom-wiki/adom-wiki /home/adom/.local/bin/adom-wiki
+    rm -rf /tmp/adom-wiki
+    log "  $(runuser -u adom -- bash -lc 'adom-wiki --version' 2>/dev/null) installed"
 else
-    log "adompkg not staged — skipping (image/adompkg missing from build context)"
+    log "adom-wiki not staged — skipping (builder must stage /tmp/adom-wiki/adom-wiki)"
 fi
 
-# ── adompkg-managed CLIs (real adompkg apps on wiki.adom.inc/adom) ──────────
-# adom-tts + adom-google are REAL adompkg `app` packages (verified: adom/adom-tts
-# + adom/adom-google install real binaries). Install them via adompkg — the FIRST
-# adompkg-managed installs baked into the image, and the pilot for migrating the
-# rest off bare-binary curls as their packages get real publishes (the 7 above are
-# still stubs on adompkg, so they stay curl-based for now). This also POPULATES
-# ~/project/adom_modules/.installed.json so the workspace-updater daemon's
-# `adompkg install/update` works on a fresh image with zero adoption.
-# NOTE: the bake runs TOKEN-LESS in CI (no /var/run/adom/api-key) — so each
-# package MUST be ANONYMOUSLY resolvable on wiki.adom.inc. Verified 2026-06-17:
-#   adom-google → resolves anonymously ✅ (clean public adom/adom-google)
-#   adom-tts    → NOT anonymous ❌ ("package not found") — its ownership was
-#                 transferred to john/ and adom/adom-tts only resolves WITH auth.
-#                 DROPPED until republished as a clean PUBLIC adom/adom-tts.
-# Use the full adompkg path (not PATH-dependent) and let failures FAIL the build
-# (no `| tail` mask) — then hard-gate that the bins actually landed.
-if [ -x /home/adom/.local/bin/adompkg ]; then
-    ADOMPKG_MANAGED="adom-google"
-    log "adompkg-managed CLIs: ${ADOMPKG_MANAGED}"
-    as_adom "export ADOMPKG_REGISTRY=https://wiki.adom.inc; /home/adom/.local/bin/adompkg install ${ADOMPKG_MANAGED}"
-    for c in ${ADOMPKG_MANAGED}; do
+# ── wiki-managed CLIs (adom-wiki pkg apps on wiki.adom.inc/adom) ────────────
+# adom-google is a real public `app` package that installs a binary. NOTE: the
+# bake runs TOKEN-LESS — every package here MUST be ANONYMOUSLY resolvable on
+# wiki.adom.inc. Let failures FAIL the build (no `| tail` mask) — then hard-gate
+# that the bins actually landed.
+if [ -x /home/adom/.local/bin/adom-wiki ]; then
+    WIKI_MANAGED="adom/adom-google"
+    log "wiki-managed CLIs: ${WIKI_MANAGED}"
+    as_adom "/home/adom/.local/bin/adom-wiki pkg install ${WIKI_MANAGED}"
+    for c in adom-google; do
         test -e "/home/adom/.local/bin/${c}" \
-            || { echo "bake: adompkg install did not produce ~/.local/bin/${c} (anonymous resolve failed?)" >&2; exit 1; }
+            || { echo "bake: adom-wiki pkg install did not produce ~/.local/bin/${c} (anonymous resolve failed?)" >&2; exit 1; }
     done
 fi
 
-# ── HD macOS skills layer (the -mac companions) via adompkg ─────────────────
+# ── HD macOS skills layer (the -mac companions) via adom-wiki ───────────────
 # step 8 above bakes the GENERIC hd-* skills from the repo's shared/machine
 # buckets — but the macOS-platform companions (hd-*-mac) live ONLY in the wiki
-# package adom/hd-mac-bootstrap. Install it here (after adompkg is set up) so the
-# golden image ships the SAME skill set the runtime converge (install-hd-skills)
-# delivers — incl. the -mac companions — instead of a stale repo-only subset.
-# This was the v8 gap: fresh installs imported a golden with NO -mac skills.
-# Must be ANONYMOUSLY resolvable (the bake is token-less in CI); hd-mac-bootstrap
-# + its deps are public on wiki.adom.inc. ALLOW_SUDO=1 for the needs_sudo dep.
-if [ -x /home/adom/.local/bin/adompkg ]; then
-    log "adompkg: install adom/hd-mac-bootstrap (macOS skills layer + -mac companions)"
-    as_adom "export ADOMPKG_REGISTRY=https://wiki.adom.inc; ADOMPKG_ALLOW_SUDO=1 /home/adom/.local/bin/adompkg install adom/hd-mac-bootstrap"
+# package adom/hd-mac-bootstrap. Install it here (after adom-wiki is set up) so
+# the golden image ships the SAME skill set the runtime converge (install-hd-skills)
+# delivers — incl. the -mac companions + the shot/statusline helpers its
+# postinstall deploys — instead of a stale repo-only subset. (v8 gap: fresh
+# installs imported a golden with NO -mac skills.) Must be ANONYMOUSLY
+# resolvable; --allow-sudo for any needs-sudo dep in the chain.
+if [ -x /home/adom/.local/bin/adom-wiki ]; then
+    log "adom-wiki: install adom/hd-mac-bootstrap (macOS skills layer + -mac companions)"
+    as_adom "/home/adom/.local/bin/adom-wiki pkg install --allow-sudo adom/hd-mac-bootstrap"
     ls /home/adom/.claude/skills | grep -q -- '-mac' \
         || { echo 'bake: hd-mac-bootstrap did not deploy any -mac skills' >&2; exit 1; }
     log "  -mac skills present: $(ls /home/adom/.claude/skills | grep -c -- '-mac')"

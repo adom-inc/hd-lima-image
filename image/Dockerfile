@@ -115,12 +115,13 @@ COPY hd-skills /tmp/hd-skills
 # it's populated only once feature/hd-auto-update is on main. bake-hd-setup.sh
 # guards on the .sh file, so an empty dir (pre-merge) cleanly skips the daemon.
 COPY workspace-updater /tmp/workspace-updater
-# adompkg (the Adom package manager) — prerequisite for the adompkg-managed model.
-COPY adompkg /tmp/adompkg
+# adom-wiki CLI (native arm64; official wiki package manager — adompkg RETIRED).
+# CI stages the binary into the build context as adom-wiki/adom-wiki.
+COPY adom-wiki /tmp/adom-wiki
 
 # bake-hd-setup.sh pre-runs HD's setup cascade (claude CLI, Claude Code +
 # adom-vscode extensions, VS Code settings + trusted domains, HD skills,
-# adom-desktop CLI, adompkg-managed installs) — shared verbatim with
+# adom-desktop CLI, wiki-managed installs via adom-wiki) — shared verbatim with
 # scripts/build-rootfs.sh. public-scrub.sh then removes any stale-detector
 # update hook and other GitHub-auth assumptions; updates arrive as new image
 # versions, not git pulls.
