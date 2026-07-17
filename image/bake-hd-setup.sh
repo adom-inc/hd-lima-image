@@ -362,12 +362,12 @@ p = os.path.expanduser('~/.local/share/code-server/extensions/extensions.json')
 try:
     d = json.load(open(p))
     d = [e for e in d if e.get('identifier', {}).get('id') != 'anthropic.claude-code'
-         or pin in (e.get('version') or '')]
+         or pin in json.dumps(e)]
     json.dump(d, open(p, 'w'))
 except FileNotFoundError:
     pass
 PY"
-as_adom "ls -d ~/.local/share/code-server/extensions/anthropic.claude-code-${CLAUDE_EXT_PIN}* >/dev/null 2>&1 || EXTENSIONS_GALLERY='{\"serviceUrl\":\"https://127.0.0.1:1\"}' $CS --install-extension /tmp/claude-code-pin.vsix --force 2>&1 | tail -2"
+as_adom "$CS --list-extensions --show-versions 2>/dev/null | grep -qi \"claude-code@${CLAUDE_EXT_PIN}\" || EXTENSIONS_GALLERY='{\"serviceUrl\":\"https://127.0.0.1:1\"}' $CS --install-extension /tmp/claude-code-pin.vsix --force 2>&1 | tail -2"
 as_adom "V=\$($CS --list-extensions --show-versions 2>/dev/null | grep -i claude-code); echo \"  final: \$V\"; echo \"\$V\" | grep -q \"@${CLAUDE_EXT_PIN}\" && ! echo \"\$V\" | grep -v \"@${CLAUDE_EXT_PIN}\" | grep -q claude-code"
 rm -f /tmp/claude-code-pin.vsix
 
