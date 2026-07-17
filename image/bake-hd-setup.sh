@@ -85,7 +85,10 @@ log "step 16: Claude Code extension (Open VSX, pinned ${CLAUDE_EXT_PIN})"
 # /file/ URL guess 404s; the namespace is capitalized "Anthropic").
 EXT_ARCH="$(dpkg --print-architecture 2>/dev/null || echo arm64)"; [ "$EXT_ARCH" = "amd64" ] && EXT_ARCH=x64
 as_adom "curl -fsSL 'https://open-vsx.org/api/Anthropic/claude-code/linux-${EXT_ARCH}/${CLAUDE_EXT_PIN}' | jq -r '.files.download' | xargs curl -fsSL -o /tmp/claude-code-pin.vsix"
-as_adom "$CS --install-extension /tmp/claude-code-pin.vsix --force 2>&1 | tail -2"
+# EXTENSIONS_GALLERY → dead endpoint: without it code-server's CLI consults the
+# marketplace during ANY install (even a local vsix, even with autoUpdate=false in
+# settings) and silently updates to latest — reintroducing the incompatible build.
+as_adom "EXTENSIONS_GALLERY='{\"serviceUrl\":\"https://127.0.0.1:1\"}' $CS --install-extension /tmp/claude-code-pin.vsix --force 2>&1 | tail -2"
 as_adom "$CS --list-extensions --show-versions 2>/dev/null | grep -qi \"claude-code@${CLAUDE_EXT_PIN}\""
 
 # ── step 3: install-adom-vscode (extension half; binary baked earlier) ────
@@ -364,7 +367,7 @@ try:
 except FileNotFoundError:
     pass
 PY"
-as_adom "ls -d ~/.local/share/code-server/extensions/anthropic.claude-code-${CLAUDE_EXT_PIN}* >/dev/null 2>&1 || $CS --install-extension /tmp/claude-code-pin.vsix --force 2>&1 | tail -2"
+as_adom "ls -d ~/.local/share/code-server/extensions/anthropic.claude-code-${CLAUDE_EXT_PIN}* >/dev/null 2>&1 || EXTENSIONS_GALLERY='{\"serviceUrl\":\"https://127.0.0.1:1\"}' $CS --install-extension /tmp/claude-code-pin.vsix --force 2>&1 | tail -2"
 as_adom "V=\$($CS --list-extensions --show-versions 2>/dev/null | grep -i claude-code); echo \"  final: \$V\"; echo \"\$V\" | grep -q \"@${CLAUDE_EXT_PIN}\" && ! echo \"\$V\" | grep -v \"@${CLAUDE_EXT_PIN}\" | grep -q claude-code"
 rm -f /tmp/claude-code-pin.vsix
 
