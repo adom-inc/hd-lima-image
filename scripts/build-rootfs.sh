@@ -98,6 +98,11 @@ in_root "sed -i 's/# en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen && locale-gen"
 # The rootfs must carry the x86-64 glibc/loader for those binaries to load.
 # Rosetta itself is provided by the host vz VM, NOT baked into the rootfs.
 log "x86-64 multiarch (Rosetta-hybrid)"
+# ports.ubuntu.com (the arm64 base's archive) does NOT carry amd64 — pin the existing
+# deb822 stanzas to arm64 and add archive.ubuntu.com as an amd64-only source, or the
+# post-add-architecture `apt-get update` fails with "index files failed to download".
+in_root "sed -i '/^Components:/a Architectures: arm64' /etc/apt/sources.list.d/ubuntu.sources"
+in_root "printf 'Types: deb\nURIs: http://archive.ubuntu.com/ubuntu/\nSuites: noble noble-updates noble-security\nComponents: main universe\nArchitectures: amd64\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n' > /etc/apt/sources.list.d/amd64.sources"
 in_root "dpkg --add-architecture amd64 && apt-get update \\
   && apt-get install -y --no-install-recommends libc6:amd64 libstdc++6:amd64 zlib1g:amd64"
 
@@ -178,17 +183,32 @@ in_root "bash /tmp/bake-hd-setup.sh && rm -f /tmp/bake-hd-setup.sh"
 # it with proot binding the host /proc. Then remove any state files the
 # run generated: a baked ~/.claude.json would ship one shared anonymous
 # telemetry/user ID to every install.
-PROOT="${WORK}/proot"
-if [[ ! -x "${PROOT}" ]]; then
-    curl -fsSL -o "${PROOT}" https://proot.gitlab.io/proot/bin/proot
-    chmod +x "${PROOT}"
+# Prefer a REAL chroot with /proc + /dev bind-mounted — possible on build hosts
+# with mount capability (the Lima bake VM), and the closest analog of the nspawn
+# runtime. Fall back to proot for mount-less hosts (the cloud container). Note:
+# Ubuntu's apt proot SEGFAULTS running the bun-based claude on arm64, so the
+# mount path is strongly preferred; the gitlab.io proot binary is x86-64-only.
+log "verify claude CLI"
+if sudo mount --bind /proc "${ROOT}/proc" 2>/dev/null; then
+    sudo mount --bind /dev "${ROOT}/dev"
+    CLAUDE_V="$(sudo chroot "${ROOT}" runuser -u adom -- bash -lc 'claude --version' 2>/dev/null | head -1)"
+    sudo umount "${ROOT}/dev" "${ROOT}/proc"
+else
+    if command -v proot >/dev/null 2>&1; then
+        PROOT="$(command -v proot)"
+    else
+        PROOT="${WORK}/proot"
+        if [[ ! -x "${PROOT}" ]]; then
+            curl -fsSL -o "${PROOT}" https://proot.gitlab.io/proot/bin/proot
+            chmod +x "${PROOT}"
+        fi
+    fi
+    CLAUDE_V="$("${PROOT}" -r "${ROOT}" -b /proc -b /dev -w /home/adom \
+        /usr/bin/env HOME=/home/adom USER=adom PATH=/usr/local/bin:/usr/bin:/bin \
+        /home/adom/.local/bin/claude --version 2>/dev/null | head -1)"
 fi
-log "verify claude CLI under proot"
-CLAUDE_V="$("${PROOT}" -r "${ROOT}" -b /proc -b /dev -w /home/adom \
-    /usr/bin/env HOME=/home/adom USER=adom PATH=/usr/local/bin:/usr/bin:/bin \
-    /home/adom/.local/bin/claude --version 2>/dev/null | head -1)"
 echo "  claude --version → ${CLAUDE_V}"
-[[ "${CLAUDE_V}" == *"Claude Code"* ]] || { echo "claude CLI failed proot verification" >&2; exit 1; }
+[[ "${CLAUDE_V}" == *"Claude Code"* ]] || { echo "claude CLI failed functional verification" >&2; exit 1; }
 sudo rm -rf "${ROOT}/home/adom/.claude.json" "${ROOT}/home/adom/.claude.json.backup" \
     "${ROOT}/home/adom/.claude/statsig" "${ROOT}/home/adom/.cache"
 

@@ -41,9 +41,30 @@ if [ -e /proc/self ]; then
     as_adom 'curl -fsSL --connect-timeout 15 https://claude.ai/install.sh -o /tmp/claude-install.sh && bash /tmp/claude-install.sh 2>&1 | tail -4; rm -f /tmp/claude-install.sh'
     as_adom '~/.local/bin/claude --version'
 else
-    log "  no /proc (chroot build) — completing the installer's layout manually"
-    as_adom 'curl -fsSL --connect-timeout 15 https://claude.ai/install.sh -o /tmp/claude-install.sh && { bash /tmp/claude-install.sh 2>&1 | tail -4 || true; }; rm -f /tmp/claude-install.sh'
-    as_adom 'BIN="$(ls -1 ~/.claude/downloads/claude-*-linux-x64 2>/dev/null | sort -V | tail -1)"; test -s "$BIN"; VER="$(basename "$BIN" | sed "s/^claude-//; s/-linux-x64$//")"; install -D -m 0755 "$BIN" ~/.local/share/claude/versions/"$VER"; mkdir -p ~/.local/bin; ln -sfn ~/.local/share/claude/versions/"$VER" ~/.local/bin/claude'
+    # Direct download, NOT install.sh: the current installer deletes its download
+    # after `claude install` — which core-dumps without /proc — so the old
+    # "salvage from ~/.claude/downloads" trick finds nothing (broke the v11 bake).
+    # Replicate its resolve→verify→place steps ourselves (same CDN + sha256 from
+    # the manifest). Arch-agnostic: an arm64 build host bakes NATIVE claude
+    # (v10, built on x86-64, shipped the x64 binary via Rosetta).
+    log "  no /proc (chroot build) — direct checksum-verified download"
+    cat > /tmp/claude-direct.sh <<'CLAUDE_EOF'
+set -euo pipefail
+B=https://downloads.claude.ai/claude-code-releases
+V=$(curl -fsSL --connect-timeout 15 "$B/latest")
+echo "$V" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+' || { echo "bad version: $V" >&2; exit 1; }
+case "$(uname -m)" in x86_64|amd64) P=linux-x64 ;; *) P=linux-arm64 ;; esac
+SUM=$(curl -fsSL "$B/$V/manifest.json" | jq -r ".platforms[\"$P\"].checksum")
+echo "$SUM" | grep -Eq '^[a-f0-9]{64}$' || { echo "no checksum for $P" >&2; exit 1; }
+mkdir -p "$HOME/.local/share/claude/versions" "$HOME/.local/bin"
+curl -fsSL "$B/$V/$P/claude" -o "$HOME/.local/share/claude/versions/$V"
+echo "$SUM  $HOME/.local/share/claude/versions/$V" | sha256sum -c - >/dev/null
+chmod 0755 "$HOME/.local/share/claude/versions/$V"
+ln -sfn "$HOME/.local/share/claude/versions/$V" "$HOME/.local/bin/claude"
+echo "claude $V ($P) placed"
+CLAUDE_EOF
+    as_adom 'bash /tmp/claude-direct.sh'
+    rm -f /tmp/claude-direct.sh
     as_adom 'test -L ~/.local/bin/claude && test -s "$(readlink -f ~/.local/bin/claude)"'
 fi
 as_adom 'grep -q "/.local/bin" ~/.bashrc || printf "export PATH=\"\$HOME/.local/bin:\$PATH\"\n" >> ~/.bashrc'
@@ -191,8 +212,13 @@ log "step 10: adom-desktop CLI"
 VJ="$(curl -fsSL https://git-wiki-ktqxite5iglh.adom.cloud/api/v1/pages/adom-desktop/files/version.json 2>/dev/null \
    || curl -fsSL "${WIKI_BASE}/static/apps/adom-desktop/version.json")"
 AD_URL="$(echo "$VJ" | jq -r '.cli.linux_x86_64.binary_url')"
-[ -n "$AD_URL" ] && [ "$AD_URL" != "null" ]
-curl -fsSL "$AD_URL" -o /usr/local/bin/adom-desktop
+# The manifest's binary_url has been observed to 404 (upstream AD manifest bug,
+# 2026-07-17) — fall back to the wiki static path the other CLIs install from.
+if [ -z "$AD_URL" ] || [ "$AD_URL" = "null" ] \
+   || ! curl -fsSL "$AD_URL" -o /usr/local/bin/adom-desktop 2>/dev/null; then
+    log "  manifest binary_url unusable — falling back to ${WIKI_BASE}/static/apps/adom-desktop/adom-desktop"
+    curl -fsSL "${WIKI_BASE}/static/apps/adom-desktop/adom-desktop" -o /usr/local/bin/adom-desktop
+fi
 chmod 0755 /usr/local/bin/adom-desktop
 # A stale ~/.local/bin/adom-desktop (occasionally left by older installers)
 # would shadow /usr/local/bin in PATH — remove it.
