@@ -80,8 +80,11 @@ CLAUDE_EXT_PIN="2.1.177"
 log "step 16: Claude Code extension (Open VSX, pinned ${CLAUDE_EXT_PIN})"
 # Install from the exact .vsix, NOT `ext@version`: code-server's CLI has been seen
 # resolving/updating to LATEST despite the @pin (v12 bake attempt 1). A local file
-# install can only install what's in the file.
-as_adom "curl -fsSL 'https://open-vsx.org/api/anthropic/claude-code/${CLAUDE_EXT_PIN}/file/anthropic.claude-code-${CLAUDE_EXT_PIN}.vsix' -o /tmp/claude-code-pin.vsix"
+# install can only install what's in the file. The extension is PLATFORM-SPECIFIC —
+# resolve the linux-<arch> target's download URL via the Open VSX API (the bare
+# /file/ URL guess 404s; the namespace is capitalized "Anthropic").
+EXT_ARCH="$(dpkg --print-architecture 2>/dev/null || echo arm64)"; [ "$EXT_ARCH" = "amd64" ] && EXT_ARCH=x64
+as_adom "curl -fsSL 'https://open-vsx.org/api/Anthropic/claude-code/linux-${EXT_ARCH}/${CLAUDE_EXT_PIN}' | jq -r '.files.download' | xargs curl -fsSL -o /tmp/claude-code-pin.vsix"
 as_adom "$CS --install-extension /tmp/claude-code-pin.vsix --force 2>&1 | tail -2"
 as_adom "$CS --list-extensions --show-versions 2>/dev/null | grep -qi \"claude-code@${CLAUDE_EXT_PIN}\""
 
