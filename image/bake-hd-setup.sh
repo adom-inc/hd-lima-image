@@ -350,10 +350,14 @@ fi
 # its OWN matching extension version directly to disk — deleting the pinned build
 # ("Extensions added from another source", v12 first install 2026-07-17: CLI
 # 2.1.212 replaced the pinned 2.1.177 → broken panel). Documented off-switch:
-# CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL=1, planted for login shells (/etc/environment
-# is PAM-only, but Ubuntu's skel ~/.profile chains ~/.bashrc, which code-server
-# terminals and `bash -lc` both reach).
-log "claude CLI: disable IDE extension auto-install"
+# CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL=1. Planted THREE ways for full coverage:
+#   - /etc/profile.d — every login shell, and (unlike ~/.bashrc) NOT behind
+#     Ubuntu's `case $- in *i*) ;; *) return` non-interactive guard;
+#   - /etc/environment — PAM sessions;
+#   - ~/.bashrc — code-server's integrated terminal (interactive) sources it.
+log "claude CLI: disable IDE extension auto-install (profile.d + environment + bashrc)"
+printf 'export CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL=1\n' > /etc/profile.d/claude-code-no-autoinstall.sh
+chmod 0644 /etc/profile.d/claude-code-no-autoinstall.sh
 grep -q CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL /etc/environment 2>/dev/null \
     || echo 'CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL=1' >> /etc/environment
 as_adom 'grep -q CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL ~/.bashrc || echo "export CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL=1" >> ~/.bashrc'
