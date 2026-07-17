@@ -19,7 +19,12 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 VER="${GOLDEN_VERSION:-v2}"
-CSV="${CODE_SERVER_VERSION:-4.124.2}"  # latest stable; code-server self-updates + updater no longer manages it
+# PINNED to 4.100.3 (VS Code 1.100) — the last release BEFORE VS Code 1.101 added the
+# `navigator is now a global in nodejs` PendingMigration guard, which crashes the Claude Code
+# extension's host (it references navigator at load) → blank Claude panel. Anthropic has no
+# fixed build yet (open issue). Do NOT bump past 4.100.x until the extension is migrated.
+# 2026-07-17: this was THE fresh-install "Claude panel won't render" regression (4.124.2 → 1.124).
+CSV="${CODE_SERVER_VERSION:-4.100.3}"
 WIKI_BASE="${WIKI_BASE:-https://wiki-ufypy5dpx93o.adom.cloud}"
 WORK="${WORK:-/tmp/hd-golden-build}"
 ROOT="${WORK}/rootfs"
@@ -225,6 +230,8 @@ in_root "mkdir -p /var/lib/adom-bootstrap \
 # ── 9. smoke test (chroot analog of the CI smoke step) ────────────────────
 log "smoke test"
 in_root "set -e; code-server --version; node --version; git --version; \
+  code-server --version 2>/dev/null | grep -qE '^4\\.100\\.' \
+      || { echo 'code-server is NOT 4.100.x — VS Code >=1.101 crashes the Claude Code extension (navigator global guard)'; exit 1; }; \
   test -x /etc/init-host-internal.sh; test -x /opt/adom/bootstrap.sh; \
   test -f /var/lib/adom-bootstrap/phase-a-done; cat /etc/adom-golden-version; \
   for b in adom-cli adom-vscode adom-mouser adom-digikey adom-jlcpcb adom-parts-search adom-gchat; do \
