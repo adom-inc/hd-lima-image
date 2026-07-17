@@ -345,6 +345,19 @@ if [ -x /home/adom/.local/bin/adom-wiki ]; then
     log "  -mac skills present: $(ls /home/adom/.claude/skills | grep -c -- '-mac')"
 fi
 
+# ── claude CLI: never auto-install its companion IDE extension ──────────────
+# The claude CLI, when run inside a code-server/VS Code terminal, force-installs
+# its OWN matching extension version directly to disk — deleting the pinned build
+# ("Extensions added from another source", v12 first install 2026-07-17: CLI
+# 2.1.212 replaced the pinned 2.1.177 → broken panel). Documented off-switch:
+# CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL=1, planted for login shells (/etc/environment
+# is PAM-only, but Ubuntu's skel ~/.profile chains ~/.bashrc, which code-server
+# terminals and `bash -lc` both reach).
+log "claude CLI: disable IDE extension auto-install"
+grep -q CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL /etc/environment 2>/dev/null \
+    || echo 'CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL=1' >> /etc/environment
+as_adom 'grep -q CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL ~/.bashrc || echo "export CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL=1" >> ~/.bashrc'
+
 # ── FINAL claude-code pin enforcement (must be LAST — after every package install) ──
 # Anything above (code-server's own updater at install time, a wiki package's
 # postinstall merging settings) can resurrect a newer, Node-22-incompatible

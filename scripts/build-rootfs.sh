@@ -253,6 +253,9 @@ in_root "set -e; code-server --version; node --version; git --version; \
   runuser -u adom -- /usr/lib/code-server/bin/code-server --list-extensions --show-versions 2>/dev/null \
       | grep -q 'anthropic.claude-code@2.1.177' \
       || { echo 'claude-code extension NOT at the 2.1.177 pin'; exit 1; }; \
+  grep -q CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL /etc/environment \
+      && grep -q CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL /home/adom/.bashrc \
+      || { echo 'MISSING CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL (claude CLI will clobber the pinned extension)'; exit 1; }; \
   if [ -e /usr/local/bin/adom-workspace-updater ]; then \
       test -x /usr/local/bin/adom-workspace-updater || { echo 'workspace-updater not executable'; exit 1; }; \
       /usr/local/bin/adom-workspace-updater --version 2>/dev/null | grep -qE '^adom-workspace-updater [0-9]+\.[0-9]+' \
