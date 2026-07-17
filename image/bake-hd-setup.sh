@@ -78,7 +78,11 @@ as_adom 'rm -rf ~/.claude/downloads'
 # enforcement) — bump both together after verifying a new version renders.
 CLAUDE_EXT_PIN="2.1.177"
 log "step 16: Claude Code extension (Open VSX, pinned ${CLAUDE_EXT_PIN})"
-as_adom "$CS --install-extension anthropic.claude-code@${CLAUDE_EXT_PIN} --force 2>&1 | tail -3"
+# Install from the exact .vsix, NOT `ext@version`: code-server's CLI has been seen
+# resolving/updating to LATEST despite the @pin (v12 bake attempt 1). A local file
+# install can only install what's in the file.
+as_adom "curl -fsSL 'https://open-vsx.org/api/anthropic/claude-code/${CLAUDE_EXT_PIN}/file/anthropic.claude-code-${CLAUDE_EXT_PIN}.vsix' -o /tmp/claude-code-pin.vsix"
+as_adom "$CS --install-extension /tmp/claude-code-pin.vsix --force 2>&1 | tail -2"
 as_adom "$CS --list-extensions --show-versions 2>/dev/null | grep -qi \"claude-code@${CLAUDE_EXT_PIN}\""
 
 # ── step 3: install-adom-vscode (extension half; binary baked earlier) ────
@@ -334,6 +338,32 @@ if [ -x /home/adom/.local/bin/adom-wiki ]; then
         || { echo 'bake: hd-mac-bootstrap did not deploy any -mac skills' >&2; exit 1; }
     log "  -mac skills present: $(ls /home/adom/.claude/skills | grep -c -- '-mac')"
 fi
+
+# ── FINAL claude-code pin enforcement (must be LAST — after every package install) ──
+# Anything above (code-server's own updater at install time, a wiki package's
+# postinstall merging settings) can resurrect a newer, Node-22-incompatible
+# claude-code build or re-enable extension auto-update. Enforce the pin at the very
+# end, mirroring the runtime CLAUDE_EXT_PIN_SH in hydrogen-desktop: drop every
+# non-pinned build + its registry entries, re-install the pinned vsix if missing,
+# and force auto-update off in settings.json (merge, don't clobber).
+log "final claude-code pin enforcement (${CLAUDE_EXT_PIN})"
+as_adom 'node -e "const fs=require(\"fs\");const p=process.env.HOME+\"/.local/share/code-server/User/settings.json\";let s={};try{s=JSON.parse(fs.readFileSync(p,\"utf8\"))}catch(e){};s[\"extensions.autoUpdate\"]=false;s[\"extensions.autoCheckUpdates\"]=false;fs.writeFileSync(p,JSON.stringify(s,null,2))"'
+as_adom "for d in ~/.local/share/code-server/extensions/anthropic.claude-code-*; do [ -d \"\$d\" ] || continue; case \"\$d\" in *${CLAUDE_EXT_PIN}*) ;; *) rm -rf \"\$d\";; esac; done"
+as_adom "python3 - '${CLAUDE_EXT_PIN}' <<'PY'
+import json, os, sys
+pin = sys.argv[1]
+p = os.path.expanduser('~/.local/share/code-server/extensions/extensions.json')
+try:
+    d = json.load(open(p))
+    d = [e for e in d if e.get('identifier', {}).get('id') != 'anthropic.claude-code'
+         or pin in (e.get('version') or '')]
+    json.dump(d, open(p, 'w'))
+except FileNotFoundError:
+    pass
+PY"
+as_adom "ls -d ~/.local/share/code-server/extensions/anthropic.claude-code-${CLAUDE_EXT_PIN}* >/dev/null 2>&1 || $CS --install-extension /tmp/claude-code-pin.vsix --force 2>&1 | tail -2"
+as_adom "V=\$($CS --list-extensions --show-versions 2>/dev/null | grep -i claude-code); echo \"  final: \$V\"; echo \"\$V\" | grep -q \"@${CLAUDE_EXT_PIN}\" && ! echo \"\$V\" | grep -v \"@${CLAUDE_EXT_PIN}\" | grep -q claude-code"
+rm -f /tmp/claude-code-pin.vsix
 
 # ── tidy ───────────────────────────────────────────────────────────────────
 # install.mjs leaves an empty {"mcpServers":{}} at ~/project/.mcp.json —
