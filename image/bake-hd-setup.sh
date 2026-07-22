@@ -343,6 +343,32 @@ if [ -x /home/adom/.local/bin/adom-wiki ]; then
     ls /home/adom/.claude/skills | grep -q -- '-mac' \
         || { echo 'bake: hd-mac-bootstrap did not deploy any -mac skills' >&2; exit 1; }
     log "  -mac skills present: $(ls /home/adom/.claude/skills | grep -c -- '-mac')"
+
+    # Converge ALL installed packages to their current registry versions so a fresh
+    # golden ships up to date (bake-time install already pulls latest, but a rebuild
+    # from cached layers can lag — pkg update is the belt).
+    log "adom-wiki: pkg update (converge all installed packages to latest)"
+    as_adom "/home/adom/.local/bin/adom-wiki pkg update --allow-sudo 2>&1 | tail -4" || \
+        log "  (pkg update returned nonzero — continuing; bake-time installs are already latest)"
+
+    # ── Activate the registry-native auto-updater (adom/hook) ──────────────────
+    # The workspace-updater daemon retired (main 2026-07-16); adom/hook IS the update
+    # path now (adom-core-update.sh on a UserPromptSubmit hook + a */30 cron). adom/hook
+    # comes in as a dependency, but RUN its install.sh explicitly here so the hook script
+    # is deployed + wired regardless of dep-chain ordering. public-scrub.sh keeps it
+    # (strips only the model pin + the legacy check-updates hook). Fixes the 2026-07-22
+    # dead-trigger state (script scrubbed, cron/Codex left pointing at a missing file).
+    HOOK_DIR=/home/adom/project/adom_modules/adom/hook
+    if [ -d "$HOOK_DIR" ]; then
+        log "adom-wiki: activate adom/hook auto-updater (install.sh)"
+        as_adom "cd $HOOK_DIR && bash install.sh 2>&1 | tail -6"
+        test -x /home/adom/.adom/hooks/adom-core-update.sh \
+            || { echo 'bake: adom/hook install.sh did not deploy ~/.adom/hooks/adom-core-update.sh' >&2; exit 1; }
+        log "  adom-core-update hook deployed"
+    else
+        echo "bake: adom/hook package dir missing ($HOOK_DIR) — the auto-updater will not be wired" >&2
+        exit 1
+    fi
 fi
 
 # ── claude CLI: never auto-install its companion IDE extension ──────────────
