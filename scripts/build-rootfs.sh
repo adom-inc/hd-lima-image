@@ -258,8 +258,8 @@ in_root "set -e; code-server --version; node --version; git --version; \
       /home/adom/.local/share/code-server/User/settings.json >/dev/null \
       || { echo 'ext auto-update NOT disabled (a silent update to a Node-incompatible claude-code build blanks the panel)'; exit 1; }; \
   runuser -u adom -- /usr/lib/code-server/bin/code-server --list-extensions --show-versions 2>/dev/null \
-      | grep -q 'anthropic.claude-code@2.1.177' \
-      || { echo 'claude-code extension NOT at the 2.1.177 pin'; exit 1; }; \
+      | grep -q 'anthropic.claude-code@2.1.218' \
+      || { echo 'claude-code extension NOT at the 2.1.218 pin'; exit 1; }; \
   test -f /etc/profile.d/claude-code-no-autoinstall.sh \
       && grep -q CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL /etc/environment \
       && grep -q CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL /home/adom/.bashrc \

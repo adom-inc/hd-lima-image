@@ -72,11 +72,13 @@ as_adom 'rm -rf ~/.claude/downloads'
 
 # ── step 16: install-claude-ext ────────────────────────────────────────────
 # PINNED, never latest: newer extension builds can be incompatible with
-# code-server's Node (2.1.179+ crash → blank Claude panel; baking latest 2.1.212
-# in v11 hung every fresh install, 2026-07-17). LOCKSTEP: this pin must match
-# CLAUDE_CODE_PIN in hydrogen-desktop setup_steps_macos.rs (the runtime
-# enforcement) — bump both together after verifying a new version renders.
-CLAUDE_EXT_PIN="2.1.177"
+# code-server's Node (2.1.179–2.1.212 crash → blank Claude panel; baking latest
+# 2.1.212 in v11 hung every fresh install, 2026-07-17). 2.1.218 fixed the
+# navigator crash — verified live 2026-07-24 under code-server 4.100.3 (activates,
+# renders, full send/receive). LOCKSTEP: this pin must match CLAUDE_CODE_PIN in
+# hydrogen-desktop setup_steps_macos.rs (the runtime enforcement) — bump both
+# together after verifying a new version renders.
+CLAUDE_EXT_PIN="2.1.218"
 log "step 16: Claude Code extension (Open VSX, pinned ${CLAUDE_EXT_PIN})"
 # Install from the exact .vsix, NOT `ext@version`: code-server's CLI has been seen
 # resolving/updating to LATEST despite the @pin (v12 bake attempt 1). A local file
@@ -413,6 +415,32 @@ PY"
 as_adom "$CS --list-extensions --show-versions 2>/dev/null | grep -qi \"claude-code@${CLAUDE_EXT_PIN}\" || EXTENSIONS_GALLERY='{\"serviceUrl\":\"https://127.0.0.1:1\"}' $CS --install-extension /tmp/claude-code-pin.vsix --force 2>&1 | tail -2"
 as_adom "V=\$($CS --list-extensions --show-versions 2>/dev/null | grep -i claude-code); echo \"  final: \$V\"; echo \"\$V\" | grep -q \"@${CLAUDE_EXT_PIN}\" && ! echo \"\$V\" | grep -v \"@${CLAUDE_EXT_PIN}\" | grep -q claude-code"
 rm -f /tmp/claude-code-pin.vsix
+
+# One Claude icon, not two: the extension manifest declares TWO activity-bar
+# containers with the same logo (claude-sidebar shows because Code 1.100 lacks the
+# secondary sidebar; claude-sessions-sidebar's context is set unconditionally), and
+# Code 1.100 IGNORES `when` on viewsContainers (honors it on views). Drop the
+# sessions container, gate its views off, and clear the manifest cache the
+# workbench actually reads (mirrors CLAUDE_EXT_PIN_SH in hydrogen-desktop).
+log "claude-code activity-bar icon dedupe"
+as_adom "python3 - <<'PY'
+import json, glob, os
+for pj in glob.glob(os.path.expanduser('~/.local/share/code-server/extensions/anthropic.claude-code-*/package.json')):
+    d = json.load(open(pj))
+    c = d.get('contributes', {})
+    ab = c.get('viewsContainers', {}).get('activitybar', [])
+    if not any(x.get('id') == 'claude-sessions-sidebar' for x in ab):
+        continue
+    c['viewsContainers']['activitybar'] = [x for x in ab if x.get('id') != 'claude-sessions-sidebar']
+    views = c.get('views', {})
+    moved = views.pop('claude-sessions-sidebar', [])
+    for v in moved: v['when'] = 'false'
+    views.setdefault('claude-sidebar', []).extend(moved)
+    json.dump(d, open(pj, 'w'), indent=1)
+    print('  deduped:', pj)
+cache = os.path.expanduser('~/.local/share/code-server/CachedProfilesData/__default__profile__/extensions.user.cache')
+if os.path.exists(cache): os.remove(cache)
+PY"
 
 # ── tidy ───────────────────────────────────────────────────────────────────
 # install.mjs leaves an empty {"mcpServers":{}} at ~/project/.mcp.json —
