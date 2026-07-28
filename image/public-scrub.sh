@@ -6,8 +6,19 @@
 #   - any stale-detector update hook (UserPromptSubmit → check-updates.sh):
 #     a periodic `git fetch` against a private repo — wrong for non-employee
 #     machines. Updates ship as new image versions instead.
-#   - adom/core postinstall's "model" pin (opus[1m]) in ~/.claude/settings.json:
-#     Claude Code must pick its own default model on public installs.
+#   - the "model" pin (opus[1m]) in ~/.claude/settings.json: Claude Code must pick
+#     its own default model on public installs. WRITTEN BY adom/hook's install.sh,
+#     NOT by adom/core (which is a pure dependency manifest with no scripts; it just
+#     pulls in the hook). This comment said adom/core until 2026-07-28 and cost a
+#     round trip chasing the wrong package — the write is `d["model"] = "opus[1m]"`
+#     in hook's install.sh, guarded only-if-absent and skippable with
+#     ADOM_HOOK_NO_MODEL_DEFAULT=1.
+#
+#     NOTE the del(.model) below is bake-time only, so it does NOT hold: adom/hook
+#     re-installs on every `adom-wiki pkg update` (the auto-updater kept below) and
+#     the only-if-absent write refills the key days after the image ships. HD sets
+#     ADOM_HOOK_NO_MODEL_DEFAULT=1 machine-wide at launch, which is what actually
+#     keeps it unpinned; deleting alone just feeds the refill.
 #   - bake-time update stamps under ~/.adom
 #
 # KEEP the adom/hook auto-updater (UserPromptSubmit → ~/.adom/hooks/adom-core-update.sh
@@ -34,6 +45,23 @@ if [[ -f "$S" ]]; then
         "$S" > "$S.tmp"
     mv "$S.tmp" "$S"
     chown 1001:1001 "$S"
+fi
+
+# Make the del(.model) above actually STICK. Without this the next `adom-wiki pkg
+# update` re-runs adom/hook's install and its only-if-absent write refills the key —
+# so the image ships unpinned and drifts back to pinned within a day of normal use.
+# Three files because the hook can fire from three shell paths: PAM/nspawn services
+# (/etc/environment), login shells (profile.d), and code-server's interactive
+# non-login terminal (.bashrc). Idempotent; HD asserts the same thing at launch, so
+# an image baked before this still self-heals.
+grep -q '^ADOM_HOOK_NO_MODEL_DEFAULT=' /etc/environment 2>/dev/null \
+    || echo 'ADOM_HOOK_NO_MODEL_DEFAULT=1' >> /etc/environment
+printf '%s\n' \
+    '# Public image: Claude Code picks its own default model (adom/hook opt-out).' \
+    'export ADOM_HOOK_NO_MODEL_DEFAULT=1' > /etc/profile.d/hd-no-model-pin.sh
+chmod 0644 /etc/profile.d/hd-no-model-pin.sh
+if [[ -f /home/adom/.bashrc ]] && ! grep -q ADOM_HOOK_NO_MODEL_DEFAULT /home/adom/.bashrc; then
+    echo 'export ADOM_HOOK_NO_MODEL_DEFAULT=1  # Claude Code picks its own model' >> /home/adom/.bashrc
 fi
 
 rm -f /home/adom/.adom/last-update-check \
