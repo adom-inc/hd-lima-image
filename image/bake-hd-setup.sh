@@ -197,6 +197,26 @@ PY
 grep -q __hdTrustedDomains "$WB"
 grep -q adom.activityBarSeeded "$WB"
 
+# The IndexedDB seed above is DEFEATED on macOS: HD's WKWebView loads code-server as a
+# cross-origin iframe, whose partitioned third-party IndexedDB never reaches the store
+# the trusted-domains validator reads. HD patches product.json per-launch as the fix,
+# but a FRESH image's very first session loads the workbench before that patch+restart
+# and keeps the unpatched list in memory — the "open external website?" dialog fires
+# exactly once, during first-boot Claude sign-in (Kyle, 2026-07-28). Bake the patch so
+# the first byte code-server ever serves is already trusted; HD's per-launch converge
+# then no-ops forever.
+python3 - /usr/lib/code-server/lib/vscode/product.json <<'PY'
+import json, sys
+p = sys.argv[1]
+j = json.load(open(p))
+a = j.get("linkProtectionTrustedDomains") or []
+if "*" not in a:
+    a.append("*")
+    j["linkProtectionTrustedDomains"] = a
+    json.dump(j, open(p, "w"), indent=2)
+PY
+python3 -c 'import json,sys; sys.exit(0 if "*" in json.load(open("/usr/lib/code-server/lib/vscode/product.json")).get("linkProtectionTrustedDomains", []) else 1)'
+
 # ── step 8: install-hd-skills ──────────────────────────────────────────────
 # Builder stages hydrogen-desktop/skills/public-facing/{shared,machine} at
 # /tmp/hd-skills. Flat install, shared + machine buckets only (never docker/).
