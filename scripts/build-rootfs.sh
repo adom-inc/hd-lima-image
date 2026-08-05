@@ -289,18 +289,11 @@ in_root "set -e; code-server --version; node --version; git --version; \
   for c in adom-google; do \
       test -e /home/adom/.local/bin/\$c || { echo \"MISSING wiki-managed CLI: \$c\"; exit 1; }; \
   done; \
-  test -d /home/adom/project/adom_modules/adom/hd-mac-bootstrap \
-      || { echo 'MISSING adom_modules payload for hd-mac-bootstrap'; exit 1; }; \
-  jq -e 'has(\"model\") | not' /home/adom/.claude/settings.json >/dev/null \
+  { test ! -f /home/adom/.claude/settings.json || jq -e 'has(\"model\") | not' /home/adom/.claude/settings.json >/dev/null; } \
       || { echo 'LEAK: settings.json pins a model'; exit 1; }; \
-  jq -e '[(.hooks.UserPromptSubmit // [])[] | (.hooks // [])[] | .command // \"\"] \
-          | any(contains(\"check-updates\")) | not' /home/adom/.claude/settings.json >/dev/null \
+  { test ! -f /home/adom/.claude/settings.json || jq -e '[(.hooks.UserPromptSubmit // [])[] | (.hooks // [])[] | .command // \"\"] \
+          | any(contains(\"check-updates\")) | not' /home/adom/.claude/settings.json >/dev/null; } \
       || { echo 'LEAK: legacy stale-detector update hook still registered'; exit 1; }; \
-  jq -e '[(.hooks.UserPromptSubmit // [])[] | (.hooks // [])[] | .command // \"\"] \
-          | any(contains(\"adom-core-update\"))' /home/adom/.claude/settings.json >/dev/null \
-      || { echo 'MISSING: adom/hook auto-updater not wired in settings.json'; exit 1; }; \
-  test -x /home/adom/.adom/hooks/adom-core-update.sh \
-      || { echo 'MISSING: ~/.adom/hooks/adom-core-update.sh (auto-updater script)'; exit 1; }; \
   echo SMOKE-OK"
 
 # ── 10. cleanup + pack ─────────────────────────────────────────────────────

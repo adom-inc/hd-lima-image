@@ -54,8 +54,11 @@ jobs:
               test -x /usr/local/bin/$b || { echo "MISSING $b"; exit 1; }
             done
             id adom | grep -q "uid=1001"
-            jq -e "has(\"model\") | not" /home/adom/.claude/settings.json
-            jq -e "[(.hooks.UserPromptSubmit // [])[] | (.hooks // [])[] | .command // \"\"] | any(contains(\"check-updates\")) | not" /home/adom/.claude/settings.json
+            # slim image: ~/.claude/settings.json is created by the runtime converge, not the bake
+            if [ -f /home/adom/.claude/settings.json ]; then
+              jq -e "has(\"model\") | not" /home/adom/.claude/settings.json
+              jq -e "[(.hooks.UserPromptSubmit // [])[] | (.hooks // [])[] | .command // \"\"] | any(contains(\"check-updates\")) | not" /home/adom/.claude/settings.json
+            fi
             jq -e ".\"chat.agent.enabled\" == false" /home/adom/.local/share/code-server/User/settings.json
             jq -e ".\"extensions.autoUpdate\" == true and .\"extensions.autoCheckUpdates\" == true" /home/adom/.local/share/code-server/User/settings.json
             grep -q "disable-update-check: true" /home/adom/.config/code-server/config.yaml
