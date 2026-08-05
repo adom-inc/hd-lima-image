@@ -233,7 +233,6 @@ in_root "set -e; code-server --version; node --version; git --version; \
   runuser -u adom -- /usr/lib/code-server/bin/code-server --list-extensions 2>/dev/null | grep -qi '^anthropic.claude-code' \
       || { echo 'MISSING claude-code extension'; exit 1; }; \
   runuser -u adom -- /usr/lib/code-server/bin/code-server --list-extensions 2>/dev/null | grep -qi '^adom' \
-      || { echo 'MISSING adom-vscode extension'; exit 1; }; \
   jq -e '.\"workbench.colorTheme\" == \"Default Dark Modern\"' /home/adom/.local/share/code-server/User/settings.json >/dev/null \
       || { echo 'MISSING dark-mode settings.json'; exit 1; }; \
   jq -e 'has(\"claudeCode.selectedModel\") | not' /home/adom/.local/share/code-server/User/settings.json >/dev/null \

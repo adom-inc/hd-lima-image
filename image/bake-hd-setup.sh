@@ -97,10 +97,11 @@ as_adom "$CS --list-extensions --show-versions 2>/dev/null | grep -qi \"claude-c
 # `adom-vscode install` drops the .vsix at /tmp + skill + completions but
 # does NOT register with code-server (proven 2026-05-31) — register the
 # .vsix explicitly, then verify, exactly like the cascade.
-log "step 3: adom-vscode extension"
-as_adom '/usr/local/bin/adom-vscode install 2>&1 | sed "s/\x1b\[[0-9;]*m//g" | tail -6 || true'
-as_adom 'V=$(ls -1 /tmp/adom-vscode-*.vsix 2>/dev/null | head -1); test -n "$V" && '"$CS"' --install-extension "$V" --force 2>&1 | tail -3'
-as_adom "$CS --list-extensions 2>/dev/null | grep -qi adom"
+log "step 3: adom-vscode extension — NOT baked (slim image)"
+# SLIM (Kyle 2026-08-05): the converge (install-hd-skills -> hd-bootstrap postinstall)
+# installs + registers the adom-vscode extension at first install. Baking it required
+# EXECUTING the x86-64 CLI, which no Rosetta-less bake env (CI docker, plain chroot)
+# can do — and it was redundant with the converge anyway.
 
 # ── step configure-vscode: settings.json ──────────────────────────────────
 # setup_steps_macos.rs "configure-vscode" payload PLUS the chat/UI disables
