@@ -221,6 +221,7 @@ in_root "mkdir -p /var/lib/adom-bootstrap \
 # ── 9. smoke test (chroot analog of the CI smoke step) ────────────────────
 log "smoke test"
 in_root "set -e; code-server --version; node --version; git --version; \
+  test -e /lib64/ld-linux-x86-64.so.2 || { echo 'MISSING x86-64 loader (Rosetta-hybrid glibc)'; exit 1; }; \
   code-server --version 2>/dev/null | grep -qE '^4\\.100\\.' \
       || { echo 'code-server is NOT 4.100.x — VS Code >=1.101 crashes the Claude Code extension (navigator global guard)'; exit 1; }; \
   test -x /etc/init-host-internal.sh; test -x /opt/adom/bootstrap.sh; \

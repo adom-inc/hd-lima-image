@@ -62,6 +62,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
+# ── x86-64 multiarch glibc (Rosetta-hybrid) ─────────────────────────────────
+# The machine runs inside a Lima vz VM with Rosetta binfmt: x86-64 Adom CLIs
+# exec translated, but they still need the x86-64 loader + glibc INSIDE the
+# rootfs (/lib64/ld-linux-x86-64.so.2). This was only in the chroot builder
+# (build-rootfs.sh step 3b) — v16, the first CI/Dockerfile bake, shipped
+# without it and every x86-64 CLI died with "rosetta error: failed to open
+# elf" (caught live 2026-08-05). ports.ubuntu.com carries no amd64: pin the
+# existing sources to arm64 and add archive.ubuntu.com amd64-only.
+RUN set -e; \
+    for f in /etc/apt/sources.list.d/*.sources; do \
+      grep -q '^Architectures:' "$f" || printf 'Architectures: arm64\n' >> "$f"; \
+    done; \
+    printf 'Types: deb\nURIs: http://archive.ubuntu.com/ubuntu/\nSuites: noble noble-updates noble-security\nComponents: main universe\nArchitectures: amd64\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n' > /etc/apt/sources.list.d/amd64.sources; \
+    dpkg --add-architecture amd64; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends libc6:amd64 libstdc++6:amd64 zlib1g:amd64; \
+    test -e /lib64/ld-linux-x86-64.so.2
+
 ENV LANG=en_US.UTF-8 \
     LC_ALL=en_US.UTF-8
 

@@ -45,6 +45,7 @@ jobs:
           docker run --rm golden bash -lc '
             set -e
             code-server --version
+            test -e /lib64/ld-linux-x86-64.so.2 || { echo "MISSING x86-64 loader (Rosetta-hybrid glibc)"; exit 1; }
             node --version
             test -x /etc/init-host-internal.sh
             test -x /opt/adom/bootstrap.sh
