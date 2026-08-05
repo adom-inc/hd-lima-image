@@ -141,30 +141,14 @@ sudo install -m 0755 image/init-host-internal.sh "${ROOT}/etc/init-host-internal
 sudo install -D -m 0755 image/bootstrap.sh "${ROOT}/opt/adom/bootstrap.sh"
 in_root "chown -R adom:adom /opt/adom"
 
-# ── 7. stage HD skills, then bake the HD setup steps ──────────────────────
-# HD self-awareness skills (shared/ + machine/ buckets) staged for step 8.
-HD_SKILLS_SRC="${HD_SKILLS_SRC:-${HOME}/project/hydrogen-desktop/skills/public-facing}"
-log "staging HD skills from ${HD_SKILLS_SRC}"
-[[ -d "${HD_SKILLS_SRC}/shared" ]] || { echo "HD skills not found at ${HD_SKILLS_SRC}" >&2; exit 1; }
-sudo rm -rf "${ROOT}/tmp/hd-skills"
-sudo mkdir -p "${ROOT}/tmp/hd-skills"
-sudo cp -r "${HD_SKILLS_SRC}/shared" "${HD_SKILLS_SRC}/machine" "${ROOT}/tmp/hd-skills/"
+# ── 7. bake the HD setup steps ────────────────────────────────────────────
+# SLIM IMAGE (Kyle 2026-08-05): HD skills + wiki-managed skill layers are NOT
+# baked — the install cascade (install-hd-skills) pulls them fresh from the
+# wiki on every install. The image keeps only the static layer (OS, code-server
+# pin, extensions, CLIs). bake-hd-setup.sh steps self-skip when unstaged.
 
-# HD workspace-updater daemon (HD auto-update Part B) — staged for the daemon
-# step in bake-hd-setup.sh. GUARDED: only present once feature/hd-auto-update
-# is merged to hydrogen-desktop main (path absent pre-merge → bake skips).
-HD_UPDATER_SRC="${HD_UPDATER_SRC:-${HOME}/project/hydrogen-desktop/src-tauri/crates/hd-app/resources/workspace-updater}"
-if [[ -f "${HD_UPDATER_SRC}/adom-workspace-updater.sh" ]]; then
-    log "staging workspace-updater daemon from ${HD_UPDATER_SRC}"
-    sudo rm -rf "${ROOT}/tmp/workspace-updater"
-    sudo mkdir -p "${ROOT}/tmp/workspace-updater"
-    sudo cp "${HD_UPDATER_SRC}/adom-workspace-updater.sh" \
-            "${HD_UPDATER_SRC}/adom-workspace-updater.service" \
-            "${HD_UPDATER_SRC}/adom-workspace-updater.timer" \
-            "${ROOT}/tmp/workspace-updater/"
-else
-    log "workspace-updater source absent (pre-merge) — daemon bake will skip"
-fi
+# (workspace-updater daemon: NOT staged — HD ensures it per-launch via
+#  ensure_workspace_updater; the bake block self-skips.)
 
 # adom-wiki CLI (native arm64; the official wiki package manager — adompkg is
 # RETIRED) — staged for the adom-wiki step in bake-hd-setup.sh. Source: the same
@@ -286,7 +270,6 @@ in_root "set -e; code-server --version; node --version; git --version; \
       || { echo \"OWNERSHIP: non-adom path under /home/adom: \$(find /home/adom ! -user adom -print -quit)\"; exit 1; }; \
   grep -q adom.activityBarSeeded /usr/lib/code-server/lib/vscode/out/vs/code/browser/workbench/workbench.html \
       || { echo 'MISSING trusted-domains patch'; exit 1; }; \
-  ls /home/adom/.claude/skills/ | grep -q '^hd-' || { echo 'MISSING hd skills'; exit 1; }; \
   for s in hd-instapcb hd-eda-discovery; do \
       test -f /home/adom/.claude/skills/\$s/SKILL.md || { echo \"MISSING required HD skill: \$s\"; exit 1; }; \
   done; \

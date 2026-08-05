@@ -108,13 +108,9 @@ COPY bootstrap.sh /opt/adom/bootstrap.sh
 RUN chmod +x /etc/init-host-internal.sh /opt/adom/bootstrap.sh \
     && chown -R adom:adom /opt/adom
 
-# HD skills, staged into the build context by CI:
-#   hd-skills/ — hydrogen-desktop/skills/public-facing/{shared,machine}
-COPY hd-skills /tmp/hd-skills
-# workspace-updater daemon (HD auto-update Part B). CI always creates this dir;
-# it's populated only once feature/hd-auto-update is on main. bake-hd-setup.sh
-# guards on the .sh file, so an empty dir (pre-merge) cleanly skips the daemon.
-COPY workspace-updater /tmp/workspace-updater
+# SLIM IMAGE (Kyle 2026-08-05): HD skills + workspace-updater are NOT baked.
+# The install cascade pulls skills fresh from the wiki; HD ensures the updater
+# daemon per-launch. This also removes CI's private-repo (HD_REPO_TOKEN) need.
 # adom-wiki CLI (native arm64; official wiki package manager — adompkg RETIRED).
 # CI stages the binary into the build context as adom-wiki/adom-wiki.
 COPY adom-wiki /tmp/adom-wiki

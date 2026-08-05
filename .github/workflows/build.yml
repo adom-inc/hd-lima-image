@@ -32,29 +32,8 @@ jobs:
       # adom-inc/hydrogen-desktop stored as the HD_REPO_TOKEN repo secret.
       # .git is stripped: the public image must not carry the private
       # remote or require auth.
-      - name: Snapshot HD skills into build context
-        env:
-          HD_REPO_TOKEN: ${{ secrets.HD_REPO_TOKEN }}
-        run: |
-          git clone --depth 1 --filter=blob:none --sparse \
-            "https://x-access-token:${HD_REPO_TOKEN}@github.com/adom-inc/hydrogen-desktop.git" /tmp/hd-checkout
-          git -C /tmp/hd-checkout sparse-checkout set skills/public-facing src-tauri/crates/hd-app/resources/workspace-updater
-          mkdir -p image/hd-skills
-          cp -r /tmp/hd-checkout/skills/public-facing/shared /tmp/hd-checkout/skills/public-facing/machine image/hd-skills/
-          # workspace-updater daemon (HD auto-update Part B) — present only once
-          # feature/hd-auto-update is merged to main; guarded so pre-merge builds work.
-          # Dir ALWAYS exists (Dockerfile COPY needs a source); populated only
-          # if the daemon is on main. bake-hd-setup.sh guards on the .sh file.
-          mkdir -p image/workspace-updater
-          UPD=/tmp/hd-checkout/src-tauri/crates/hd-app/resources/workspace-updater
-          if [ -f "$UPD/adom-workspace-updater.sh" ]; then
-            cp "$UPD/adom-workspace-updater.sh" "$UPD/adom-workspace-updater.service" "$UPD/adom-workspace-updater.timer" image/workspace-updater/
-            echo "workspace-updater staged"
-          else
-            echo "workspace-updater absent on main (pre-merge) — daemon bake will skip"
-          fi
-          rm -rf /tmp/hd-checkout
-
+      # (SLIM IMAGE, Kyle 2026-08-05: no HD-skills/updater snapshot — the image no
+      #  longer bakes them, which also removes the HD_REPO_TOKEN private-repo need.)
       - name: Build image
         run: |
           docker build \
@@ -75,12 +54,6 @@ jobs:
               test -x /usr/local/bin/$b || { echo "MISSING $b"; exit 1; }
             done
             id adom | grep -q "uid=1001"
-            test -x /home/adom/.local/bin/adompkg && test -f /home/adom/.local/bin/adompkg.mjs || { echo "MISSING adompkg"; exit 1; }
-            /home/adom/.local/bin/adompkg --version >/dev/null || { echo "adompkg --version failed"; exit 1; }
-            grep -q "ADOMPKG_REGISTRY=https://wiki.adom.inc" /etc/environment || { echo "MISSING ADOMPKG_REGISTRY pin"; exit 1; }
-            for c in adom-google; do test -e /home/adom/.local/bin/$c || { echo "MISSING adompkg-managed CLI: $c"; exit 1; }; done
-            test -f /home/adom/project/adom_modules/.installed.json || { echo "MISSING adom_modules/.installed.json"; exit 1; }
-            for s in hd-instapcb hd-eda-discovery; do test -f /home/adom/.claude/skills/$s/SKILL.md || { echo "MISSING required HD skill: $s"; exit 1; }; done
             jq -e "has(\"model\") | not" /home/adom/.claude/settings.json
             jq -e "[(.hooks.UserPromptSubmit // [])[] | (.hooks // [])[] | .command // \"\"] | any(contains(\"check-updates\")) | not" /home/adom/.claude/settings.json
             jq -e ".\"chat.agent.enabled\" == false" /home/adom/.local/share/code-server/User/settings.json

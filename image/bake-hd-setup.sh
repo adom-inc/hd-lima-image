@@ -350,48 +350,13 @@ if [ -x /home/adom/.local/bin/adom-wiki ]; then
     done
 fi
 
-# ── HD macOS skills layer (the -mac companions) via adom-wiki ───────────────
-# step 8 above bakes the GENERIC hd-* skills from the repo's shared/machine
-# buckets — but the macOS-platform companions (hd-*-mac) live ONLY in the wiki
-# package adom/hd-mac-bootstrap. Install it here (after adom-wiki is set up) so
-# the golden image ships the SAME skill set the runtime converge (install-hd-skills)
-# delivers — incl. the -mac companions + the shot/statusline helpers its
-# postinstall deploys — instead of a stale repo-only subset. (v8 gap: fresh
-# installs imported a golden with NO -mac skills.) Must be ANONYMOUSLY
-# resolvable; --allow-sudo for any needs-sudo dep in the chain.
-if [ -x /home/adom/.local/bin/adom-wiki ]; then
-    log "adom-wiki: install adom/hd-mac-bootstrap (macOS skills layer + -mac companions)"
-    as_adom "/home/adom/.local/bin/adom-wiki pkg install --allow-sudo adom/hd-mac-bootstrap"
-    ls /home/adom/.claude/skills | grep -q -- '-mac' \
-        || { echo 'bake: hd-mac-bootstrap did not deploy any -mac skills' >&2; exit 1; }
-    log "  -mac skills present: $(ls /home/adom/.claude/skills | grep -c -- '-mac')"
-
-    # Converge ALL installed packages to their current registry versions so a fresh
-    # golden ships up to date (bake-time install already pulls latest, but a rebuild
-    # from cached layers can lag — pkg update is the belt).
-    log "adom-wiki: pkg update (converge all installed packages to latest)"
-    as_adom "/home/adom/.local/bin/adom-wiki pkg update --allow-sudo 2>&1 | tail -4" || \
-        log "  (pkg update returned nonzero — continuing; bake-time installs are already latest)"
-
-    # ── Activate the registry-native auto-updater (adom/hook) ──────────────────
-    # The workspace-updater daemon retired (main 2026-07-16); adom/hook IS the update
-    # path now (adom-core-update.sh on a UserPromptSubmit hook + a */30 cron). adom/hook
-    # comes in as a dependency, but RUN its install.sh explicitly here so the hook script
-    # is deployed + wired regardless of dep-chain ordering. public-scrub.sh keeps it
-    # (strips only the model pin + the legacy check-updates hook). Fixes the 2026-07-22
-    # dead-trigger state (script scrubbed, cron/Codex left pointing at a missing file).
-    HOOK_DIR=/home/adom/project/adom_modules/adom/hook
-    if [ -d "$HOOK_DIR" ]; then
-        log "adom-wiki: activate adom/hook auto-updater (install.sh)"
-        as_adom "cd $HOOK_DIR && bash install.sh 2>&1 | tail -6"
-        test -x /home/adom/.adom/hooks/adom-core-update.sh \
-            || { echo 'bake: adom/hook install.sh did not deploy ~/.adom/hooks/adom-core-update.sh' >&2; exit 1; }
-        log "  adom-core-update hook deployed"
-    else
-        echo "bake: adom/hook package dir missing ($HOOK_DIR) — the auto-updater will not be wired" >&2
-        exit 1
-    fi
-fi
+# ── (SLIM IMAGE, Kyle 2026-08-05) ──────────────────────────────────────────
+# The wiki-managed skills layer (adom/hd-mac-bootstrap, adom/core tree, the
+# adom/hook auto-updater) is NOT baked: the HD install cascade installs it all
+# fresh from the wiki on every install (install-hd-skills), and a fresh pkg
+# install runs every package's install script — so baking it here was pure
+# redundancy + drift. adom-wiki CLI + adom-google (not in the cascade tree)
+# stay baked above.
 
 # ── claude CLI: never auto-install its companion IDE extension ──────────────
 # The claude CLI, when run inside a code-server/VS Code terminal, force-installs
