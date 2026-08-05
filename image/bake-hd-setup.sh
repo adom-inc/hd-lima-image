@@ -262,7 +262,17 @@ chmod 0755 /usr/local/bin/adom-desktop
 # A stale ~/.local/bin/adom-desktop (occasionally left by older installers)
 # would shadow /usr/local/bin in PATH — remove it.
 rm -f /home/adom/.local/bin/adom-desktop
-as_adom 'adom-desktop --version'
+# Exec-verify only when the binary's arch matches the bake env (x86-64 CLI runs
+# under Rosetta at RUNTIME; a Rosetta-less bake env can't exec it — file check there).
+# e_machine byte: b7=aarch64, 3e=x86-64 (od is coreutils — `file` may be absent)
+BIN_MACHINE="$(od -An -tx1 -j18 -N1 /usr/local/bin/adom-desktop | tr -d ' ')"
+WANT_MACHINE="$([ "$(uname -m)" = aarch64 ] && echo b7 || echo 3e)"
+if [ "$BIN_MACHINE" = "$WANT_MACHINE" ]; then
+    as_adom 'adom-desktop --version'
+else
+    test -s /usr/local/bin/adom-desktop || { echo 'adom-desktop download produced an empty file' >&2; exit 1; }
+    log "  adom-desktop staged (x86-64; exec-verify deferred to runtime Rosetta)"
+fi
 
 # ── HD in-machine workspace-updater daemon (Part B of HD auto-update) ───────
 # Staged at /tmp/workspace-updater by the builder (CI sparse-checkout / chroot
