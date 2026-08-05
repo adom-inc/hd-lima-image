@@ -72,7 +72,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # existing sources to arm64 and add archive.ubuntu.com amd64-only.
 RUN set -e; \
     for f in /etc/apt/sources.list.d/*.sources; do \
-      grep -q '^Architectures:' "$f" || printf 'Architectures: arm64\n' >> "$f"; \
+      [ -f "$f" ] || continue; \
+      grep -q '^Architectures:' "$f" || sed -i '/^Suites:/a Architectures: arm64' "$f"; \
+    done; \
+    for f in /etc/apt/sources.list /etc/apt/sources.list.d/*.list; do \
+      [ -f "$f" ] || continue; \
+      sed -i 's/^deb \(http\)/deb [arch=arm64] \1/' "$f"; \
     done; \
     printf 'Types: deb\nURIs: http://archive.ubuntu.com/ubuntu/\nSuites: noble noble-updates noble-security\nComponents: main universe\nArchitectures: amd64\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n' > /etc/apt/sources.list.d/amd64.sources; \
     dpkg --add-architecture amd64; \
