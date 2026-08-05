@@ -154,11 +154,18 @@ in_root "chown -R adom:adom /opt/adom"
 # RETIRED) — staged for the adom-wiki step in bake-hd-setup.sh. Source: the same
 # binary hydrogen-desktop bundles (scripts/fetch-adom-wiki.sh stages it there).
 ADOM_WIKI_SRC="${ADOM_WIKI_SRC:-${HOME}/project/hydrogen-desktop/src-tauri/crates/hd-app/resources/adom-wiki/adom-wiki-linux-arm64}"
-[[ -f "${ADOM_WIKI_SRC}" ]] || { echo "adom-wiki arm64 binary not found at ${ADOM_WIKI_SRC} (set ADOM_WIKI_SRC)" >&2; exit 1; }
-log "staging adom-wiki from ${ADOM_WIKI_SRC}"
+ADOM_WIKI_CLI_VERSION="${ADOM_WIKI_CLI_VERSION:-1.0.82}"
 sudo rm -rf "${ROOT}/tmp/adom-wiki"
 sudo mkdir -p "${ROOT}/tmp/adom-wiki"
-sudo cp "${ADOM_WIKI_SRC}" "${ROOT}/tmp/adom-wiki/adom-wiki"
+if [[ -f "${ADOM_WIKI_SRC}" ]]; then
+    log "staging adom-wiki from ${ADOM_WIKI_SRC}"
+    sudo cp "${ADOM_WIKI_SRC}" "${ROOT}/tmp/adom-wiki/adom-wiki"
+else
+    log "staging adom-wiki ${ADOM_WIKI_CLI_VERSION} from the wiki (anonymous release asset)"
+    curl -fsSL "https://wiki.adom.inc/download/adom/adom-wiki-cli/${ADOM_WIKI_CLI_VERSION}/adom-wiki-linux-arm64" -o /tmp/adom-wiki-dl
+    sudo mv /tmp/adom-wiki-dl "${ROOT}/tmp/adom-wiki/adom-wiki"
+fi
+sudo chmod 0755 "${ROOT}/tmp/adom-wiki/adom-wiki"
 
 # bake-hd-setup.sh pre-runs the HD setup cascade (claude CLI, Claude Code +
 # adom-vscode extensions, VS Code settings, trusted domains, HD skills,

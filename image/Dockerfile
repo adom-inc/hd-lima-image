@@ -112,8 +112,12 @@ RUN chmod +x /etc/init-host-internal.sh /opt/adom/bootstrap.sh \
 # The install cascade pulls skills fresh from the wiki; HD ensures the updater
 # daemon per-launch. This also removes CI's private-repo (HD_REPO_TOKEN) need.
 # adom-wiki CLI (native arm64; official wiki package manager — adompkg RETIRED).
-# CI stages the binary into the build context as adom-wiki/adom-wiki.
-COPY adom-wiki /tmp/adom-wiki
+# Fetched ANONYMOUSLY from the wiki's own release assets (no private-repo need).
+ARG ADOM_WIKI_CLI_VERSION=1.0.82
+RUN mkdir -p /tmp/adom-wiki \
+    && curl -fsSL "https://wiki.adom.inc/download/adom/adom-wiki-cli/${ADOM_WIKI_CLI_VERSION}/adom-wiki-linux-arm64" \
+         -o /tmp/adom-wiki/adom-wiki \
+    && chmod 0755 /tmp/adom-wiki/adom-wiki
 
 # bake-hd-setup.sh pre-runs HD's setup cascade (claude CLI, Claude Code +
 # adom-vscode extensions, VS Code settings + trusted domains, HD skills,
