@@ -45,6 +45,7 @@ jobs:
           docker run --rm golden bash -lc '
             set -e
             code-server --version
+            code-server --version | head -1 | grep -qE "^4\.100\." || { echo "code-server is NOT 4.100.x — VS Code >=1.101 crashes the Claude Code extension (navigator guard)"; exit 1; }
             test -e /lib64/ld-linux-x86-64.so.2 || { echo "MISSING x86-64 loader (Rosetta-hybrid glibc)"; exit 1; }
             node --version
             test -x /etc/init-host-internal.sh

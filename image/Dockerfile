@@ -20,7 +20,14 @@ ENV DEBIAN_FRONTEND=noninteractive
 # code-server is a BAKED CORE FEATURE and self-updates; the workspace-updater no longer manages it
 # (John 2026-06-15 — pinning an exact version made the updater re-dpkg it on every fresh install).
 # Bake the LATEST stable so a fresh install is current out of the box. (Latest as of 2026-06-16.)
-ARG CODE_SERVER_VERSION=4.124.2
+# PINNED to 4.100.3 (VS Code 1.100) — the last release BEFORE VS Code 1.101's
+# `navigator` global guard, which crashes the Claude Code extension host → BLANK
+# Claude webviews (sidebar + tabs). This ARG previously defaulted to 4.124.2 while
+# the chroot builder pinned 4.100.3 — the "keep in lockstep" rule broken at birth;
+# v16/v17 (the first CI bakes) shipped the broken editor and every fresh install
+# blanked (Kyle, 2026-08-05). Do NOT bump past 4.100.x until the extension is
+# migrated; the smoke asserts this.
+ARG CODE_SERVER_VERSION=4.100.3
 ARG GOLDEN_VERSION=dev
 ARG WIKI_BASE=https://wiki-ufypy5dpx93o.adom.cloud
 
