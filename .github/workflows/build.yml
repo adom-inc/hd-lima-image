@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@v4
 
       # Private repo — needs a token with read access to
-      # adom-inc/hydrogen-desktop stored as the HD_REPO_TOKEN repo secret.
+      # adom-inc/adom-hydrogen stored as the HD_REPO_TOKEN repo secret.
       # .git is stripped: the public image must not carry the private
       # remote or require auth.
       # (SLIM IMAGE, Kyle 2026-08-05: no HD-skills/updater snapshot — the image no

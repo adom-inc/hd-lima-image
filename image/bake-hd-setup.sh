@@ -3,7 +3,7 @@
 #
 # Run as root inside the rootfs (chroot or docker RUN). Each section names
 # the setup step it subsumes in
-# hydrogen-desktop/src-tauri/crates/hd-app/src/setup_steps_macos.rs — keep
+# adom-hydrogen/src-tauri/crates/hd-app/src/setup_steps_macos.rs — keep
 # the two in lockstep. With these baked, the runtime cascade reduces to the
 # machine/user-specific steps only: ensure-workspace (machinectl import-tar),
 # wait-codeserver, set-env-vars (live proxy port), inject-api-key,
@@ -76,7 +76,7 @@ as_adom 'rm -rf ~/.claude/downloads'
 # 2.1.212 in v11 hung every fresh install, 2026-07-17). 2.1.218 fixed the
 # navigator crash — verified live 2026-07-24 under code-server 4.100.3 (activates,
 # renders, full send/receive). LOCKSTEP: this pin must match CLAUDE_CODE_PIN in
-# hydrogen-desktop setup_steps_macos.rs (the runtime enforcement) — bump both
+# adom-hydrogen setup_steps_macos.rs (the runtime enforcement) — bump both
 # together after verifying a new version renders.
 CLAUDE_EXT_PIN="2.1.218"
 log "step 16: Claude Code extension (Open VSX, floor ${CLAUDE_EXT_PIN}, auto-update ON)"
@@ -219,7 +219,7 @@ PY
 python3 -c 'import json,sys; sys.exit(0 if "*" in json.load(open("/usr/lib/code-server/lib/vscode/product.json")).get("linkProtectionTrustedDomains", []) else 1)'
 
 # ── step 8: install-hd-skills ──────────────────────────────────────────────
-# Builder stages hydrogen-desktop/skills/public-facing/{shared,machine} at
+# Builder stages adom-hydrogen/skills/public-facing/{shared,machine} at
 # /tmp/hd-skills. Flat install, shared + machine buckets only (never docker/).
 log "step 8: HD self-awareness skills"
 if [ -d /tmp/hd-skills ]; then
@@ -276,7 +276,7 @@ fi
 
 # ── HD in-machine workspace-updater daemon (Part B of HD auto-update) ───────
 # Staged at /tmp/workspace-updater by the builder (CI sparse-checkout / chroot
-# cp from hydrogen-desktop main). GUARDED: if absent (pre-merge of
+# cp from adom-hydrogen main). GUARDED: if absent (pre-merge of
 # feature/hd-auto-update), skip cleanly so the monthly cron never breaks; once
 # the files are on main, the bake installs the daemon so a FRESH image has it
 # before HD's first launch. HD also bootstraps it into EXISTING machines via
@@ -391,7 +391,7 @@ as_adom 'grep -q CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL ~/.bashrc || echo "export CLA
 # postinstall merging settings) can drift the claude-code install. Since 2026-07-27
 # (Kyle: auto-update ON; upstream fixed the Node-22 navigator crash) the bake SEEDS
 # the floor version and leaves marketplace auto-update enabled — the runtime step in
-# hydrogen-desktop (setup_steps_macos.rs) only removes the known-broken
+# adom-hydrogen (setup_steps_macos.rs) only removes the known-broken
 # 2.1.179-2.1.212 range. Keep the two in lockstep.
 log "final claude-code floor check (${CLAUDE_EXT_PIN}, auto-update ON)"
 as_adom 'node -e "const fs=require(\"fs\");const p=process.env.HOME+\"/.local/share/code-server/User/settings.json\";let s={};try{s=JSON.parse(fs.readFileSync(p,\"utf8\"))}catch(e){};s[\"extensions.autoUpdate\"]=true;s[\"extensions.autoCheckUpdates\"]=true;fs.writeFileSync(p,JSON.stringify(s,null,2))"'
@@ -417,7 +417,7 @@ rm -f /tmp/claude-code-pin.vsix
 # secondary sidebar; claude-sessions-sidebar's context is set unconditionally), and
 # Code 1.100 IGNORES `when` on viewsContainers (honors it on views). Drop the
 # sessions container, gate its views off, and clear the manifest cache the
-# workbench actually reads (mirrors CLAUDE_EXT_PIN_SH in hydrogen-desktop).
+# workbench actually reads (mirrors CLAUDE_EXT_PIN_SH in adom-hydrogen).
 log "claude-code activity-bar icon dedupe"
 as_adom "python3 - <<'PY'
 import json, glob, os

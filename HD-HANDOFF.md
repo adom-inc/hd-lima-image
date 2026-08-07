@@ -1,6 +1,6 @@
 # Handoff: golden Lima/nspawn image (arm64) — the setup cascade is pre-baked
 
-The golden image pre-runs Hydrogen Desktop's setup cascade at image-build time,
+The golden image pre-runs Adom Hydrogen's setup cascade at image-build time,
 so the macOS runtime cascade reduces to machine/user-specific steps.
 
 Built from `adom-inc/hd-lima-image` (public repo), hosted as a GitHub Release

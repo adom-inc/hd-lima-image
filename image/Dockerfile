@@ -1,12 +1,12 @@
-# Golden Lima/nspawn rootfs (arm64 Rosetta-hybrid) for Hydrogen Desktop on macOS (MacosVmRuntime).
+# Golden Lima/nspawn rootfs (arm64 Rosetta-hybrid) for Adom Hydrogen on macOS (MacosVmRuntime).
 #
-# Successor to hydrogen-desktop/wsl-thin: instead of a bare Ubuntu tarball
+# Successor to adom-hydrogen/wsl-thin: instead of a bare Ubuntu tarball
 # plus an install-time bootstrap (apt + code-server from GitHub + wiki CLIs,
 # all on the user's machine), everything install-time-flaky is baked here at
 # BUILD time. `machinectl import-tar` of the exported rootfs yields a workspace where
 # code-server starts in seconds with the Adom CLIs already on PATH.
 #
-# Parity note: the apt baseline mirrors hydrogen-desktop/docker/Dockerfile
+# Parity note: the apt baseline mirrors adom-hydrogen/docker/Dockerfile
 # (the cloud hydrogen-workspace image) — same Ubuntu 24.04 / glibc 2.39,
 # same toolchain — so any binary built in the cloud container runs here.
 #

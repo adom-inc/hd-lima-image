@@ -152,8 +152,8 @@ in_root "chown -R adom:adom /opt/adom"
 
 # adom-wiki CLI (native arm64; the official wiki package manager — adompkg is
 # RETIRED) — staged for the adom-wiki step in bake-hd-setup.sh. Source: the same
-# binary hydrogen-desktop bundles (scripts/fetch-adom-wiki.sh stages it there).
-ADOM_WIKI_SRC="${ADOM_WIKI_SRC:-${HOME}/project/hydrogen-desktop/src-tauri/crates/hd-app/resources/adom-wiki/adom-wiki-linux-arm64}"
+# binary adom-hydrogen bundles (scripts/fetch-adom-wiki.sh stages it there).
+ADOM_WIKI_SRC="${ADOM_WIKI_SRC:-${HOME}/project/adom-hydrogen/src-tauri/crates/hd-app/resources/adom-wiki/adom-wiki-linux-arm64}"
 ADOM_WIKI_CLI_VERSION="${ADOM_WIKI_CLI_VERSION:-1.0.82}"
 sudo rm -rf "${ROOT}/tmp/adom-wiki"
 sudo mkdir -p "${ROOT}/tmp/adom-wiki"

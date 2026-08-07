@@ -1,6 +1,6 @@
-# hd-lima-image — golden Lima/nspawn rootfs (arm64 Rosetta-hybrid) for Hydrogen Desktop on macOS
+# hd-lima-image — golden Lima/nspawn rootfs (arm64 Rosetta-hybrid) for Adom Hydrogen on macOS
 
-Builds the **golden image** that Hydrogen Desktop imports via
+Builds the **golden image** that Adom Hydrogen imports via
 `machinectl import-tar Adom-Workspace adom-golden-<ver>-arm64.tar.gz` — booting it as
 a **systemd-nspawn machine** inside an HD-owned **Lima** utility VM (`vmType: vz`,
 Apple Virtualization.framework, arm64 + Rosetta).
