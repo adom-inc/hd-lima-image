@@ -13,7 +13,7 @@
 # NOTHING here may require GitHub authentication — this image is public and
 # installs on machines with no GitHub identity. Sources used: the public Adom
 # wiki, Open VSX, and claude.ai. The adom skills come from the adom-wiki-managed
-# installs below (adom-wiki pkg install adom/hd-mac-bootstrap et al. — adom-wiki
+# installs below (adom-wiki pkg install adom/hydrogen-mac-bootstrap et al. — adom-wiki
 # is the official wiki CLI; adompkg is RETIRED and no longer ships in the image).
 
 set -euo pipefail
@@ -362,7 +362,7 @@ if [ -x /home/adom/.local/bin/adom-wiki ]; then
 fi
 
 # ── (SLIM IMAGE, Kyle 2026-08-05) ──────────────────────────────────────────
-# The wiki-managed skills layer (adom/hd-mac-bootstrap, adom/core tree, the
+# The wiki-managed skills layer (adom/hydrogen-mac-bootstrap, adom/core tree, the
 # adom/hook auto-updater) is NOT baked: the HD install cascade installs it all
 # fresh from the wiki on every install (install-hd-skills), and a fresh pkg
 # install runs every package's install script — so baking it here was pure
