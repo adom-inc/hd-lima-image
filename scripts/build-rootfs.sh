@@ -12,7 +12,7 @@
 # can run it.
 #
 # Usage:
-#   scripts/build-rootfs.sh            # → /tmp/hd-golden-build/adom-golden-v1.tar.gz
+#   scripts/build-rootfs.sh            # → /tmp/hydrogen-golden-build/adom-golden-v1.tar.gz
 #   GOLDEN_VERSION=v2 scripts/build-rootfs.sh
 
 set -euo pipefail
@@ -26,7 +26,7 @@ VER="${GOLDEN_VERSION:-v2}"
 # 2026-07-17: this was THE fresh-install "Claude panel won't render" regression (4.124.2 → 1.124).
 CSV="${CODE_SERVER_VERSION:-4.100.3}"
 WIKI_BASE="${WIKI_BASE:-https://wiki-ufypy5dpx93o.adom.cloud}"
-WORK="${WORK:-/tmp/hd-golden-build}"
+WORK="${WORK:-/tmp/hydrogen-golden-build}"
 ROOT="${WORK}/rootfs"
 OUT="${WORK}/adom-golden-${VER}-arm64.tar.gz"
 
@@ -141,19 +141,32 @@ sudo install -m 0755 image/init-host-internal.sh "${ROOT}/etc/init-host-internal
 sudo install -D -m 0755 image/bootstrap.sh "${ROOT}/opt/adom/bootstrap.sh"
 in_root "chown -R adom:adom /opt/adom"
 
-# ── 7. bake the HD setup steps ────────────────────────────────────────────
-# SLIM IMAGE (Kyle 2026-08-05): HD skills + wiki-managed skill layers are NOT
-# baked — the install cascade (install-hd-skills) pulls them fresh from the
+# ── 7. bake the Hydrogen setup steps ────────────────────────────────────────────
+# SLIM IMAGE (Kyle 2026-08-05): Hydrogen skills + wiki-managed skill layers are NOT
+# baked — the install cascade (install-hydrogen-skills) pulls them fresh from the
 # wiki on every install. The image keeps only the static layer (OS, code-server
-# pin, extensions, CLIs). bake-hd-setup.sh steps self-skip when unstaged.
+# pin, extensions, CLIs). bake-hydrogen-setup.sh steps self-skip when unstaged.
 
-# (workspace-updater daemon: NOT staged — HD ensures it per-launch via
+# (workspace-updater daemon: NOT staged — Hydrogen ensures it per-launch via
 #  ensure_workspace_updater; the bake block self-skips.)
 
+# adom-bridge CLI (x86-64 linux, runs under Rosetta in the machine) — staged
+# for step 10 of bake-hydrogen-setup.sh. Built from adom-inc/bridge-macos cli/
+# (cargo build --release --target x86_64-unknown-linux-gnu). REQUIRED since
+# the wiki no longer publishes a Linux CLI binary.
+BRIDGE_CLI_SRC="${BRIDGE_CLI_SRC:-${HOME}/project/bridge-macos/cli/target/x86_64-unknown-linux-gnu/release/adom-bridge}"
+sudo rm -rf "${ROOT}/tmp/adom-bridge"
+if [[ -f "${BRIDGE_CLI_SRC}" ]]; then
+  sudo mkdir -p "${ROOT}/tmp/adom-bridge"
+  sudo install -m 0755 "${BRIDGE_CLI_SRC}" "${ROOT}/tmp/adom-bridge/adom-bridge"
+else
+  echo "build-rootfs: BRIDGE_CLI_SRC not found (${BRIDGE_CLI_SRC}) — bake will fail at step 10 unless the wiki manifest carries a linux CLI" >&2
+fi
+
 # adom-wiki CLI (native arm64; the official wiki package manager — adompkg is
-# RETIRED) — staged for the adom-wiki step in bake-hd-setup.sh. Source: the same
+# RETIRED) — staged for the adom-wiki step in bake-hydrogen-setup.sh. Source: the same
 # binary adom-hydrogen bundles (scripts/fetch-adom-wiki.sh stages it there).
-ADOM_WIKI_SRC="${ADOM_WIKI_SRC:-${HOME}/project/adom-hydrogen/src-tauri/crates/hd-app/resources/adom-wiki/adom-wiki-linux-arm64}"
+ADOM_WIKI_SRC="${ADOM_WIKI_SRC:-${HOME}/project/hydrogen-macos/src-tauri/crates/hydrogen-app/resources/adom-wiki/adom-wiki-linux-arm64}"
 ADOM_WIKI_CLI_VERSION="${ADOM_WIKI_CLI_VERSION:-1.0.82}"
 sudo rm -rf "${ROOT}/tmp/adom-wiki"
 sudo mkdir -p "${ROOT}/tmp/adom-wiki"
@@ -167,12 +180,12 @@ else
 fi
 sudo chmod 0755 "${ROOT}/tmp/adom-wiki/adom-wiki"
 
-# bake-hd-setup.sh pre-runs the HD setup cascade (claude CLI, Claude Code +
-# adom-vscode extensions, VS Code settings, trusted domains, HD skills,
-# adom-desktop CLI, wiki-managed installs via adom-wiki) — shared with Dockerfile.
-log "bake HD setup steps"
-sudo install -m 0755 image/bake-hd-setup.sh "${ROOT}/tmp/bake-hd-setup.sh"
-in_root "bash /tmp/bake-hd-setup.sh && rm -f /tmp/bake-hd-setup.sh"
+# bake-hydrogen-setup.sh pre-runs the Hydrogen setup cascade (claude CLI, Claude Code +
+# adom-vscode extensions, VS Code settings, trusted domains, Hydrogen skills,
+# adom-bridge CLI, wiki-managed installs via adom-wiki) — shared with Dockerfile.
+log "bake Hydrogen setup steps"
+sudo install -m 0755 image/bake-hydrogen-setup.sh "${ROOT}/tmp/bake-hydrogen-setup.sh"
+in_root "bash /tmp/bake-hydrogen-setup.sh && rm -f /tmp/bake-hydrogen-setup.sh"
 
 # ── 7e. functional claude verification (proot, host side) ─────────────────
 # The bun-based claude binary needs /proc, which the chroot lacks — verify
@@ -277,10 +290,10 @@ in_root "set -e; code-server --version; node --version; git --version; \
       || { echo \"OWNERSHIP: non-adom path under /home/adom: \$(find /home/adom ! -user adom -print -quit)\"; exit 1; }; \
   grep -q adom.activityBarSeeded /usr/lib/code-server/lib/vscode/out/vs/code/browser/workbench/workbench.html \
       || { echo 'MISSING trusted-domains patch'; exit 1; }; \
-  for s in hd-instapcb hd-eda-discovery; do \
-      test -f /home/adom/.claude/skills/\$s/SKILL.md || { echo \"MISSING required HD skill: \$s\"; exit 1; }; \
+  for s in hydrogen-instapcb hydrogen-eda-discovery; do \
+      test -f /home/adom/.claude/skills/\$s/SKILL.md || { echo \"MISSING required Hydrogen skill: \$s\"; exit 1; }; \
   done; \
-  test -x /usr/local/bin/adom-desktop || { echo 'MISSING adom-desktop CLI'; exit 1; }; \
+  test -x /usr/local/bin/adom-bridge || { echo 'MISSING adom-bridge CLI'; exit 1; }; \
   test -x /home/adom/.local/bin/adom-wiki \
       || { echo 'MISSING adom-wiki (official wiki CLI)'; exit 1; }; \
   runuser -u adom -- bash -lc 'adom-wiki --version' >/dev/null 2>&1 || { echo 'adom-wiki --version failed'; exit 1; }; \

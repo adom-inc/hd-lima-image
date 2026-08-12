@@ -28,21 +28,21 @@ if [[ "${ALLOW_PROOT_HERE:-}" != "1" ]]; then
 fi
 
 PORT="${PORT:-38082}"
-ROOT="${ROOT:-/tmp/hd-golden-build/rootfs}"
-WORK="${WORK:-/tmp/hd-golden-build}"
+ROOT="${ROOT:-/tmp/hydrogen-golden-build/rootfs}"
+WORK="${WORK:-/tmp/hydrogen-golden-build}"
 PROOT="${PROOT:-${WORK}/proot}"
-REPO=adom-inc/hd-lima-image
+REPO=adom-inc/hydrogen-lima-image
 
 if [[ "${1:-}" == "--from" ]]; then
     VER="${2:?usage: run-rootfs.sh --from vN}"
-    ROOT="/tmp/hd-golden-test/rootfs-${VER}"
+    ROOT="/tmp/hydrogen-golden-test/rootfs-${VER}"
     if [[ ! -d "${ROOT}/usr" ]]; then
         echo "Downloading + unpacking release ${VER} → ${ROOT} (needs sudo for ownership)..."
         mkdir -p "$(dirname "${ROOT}")"
         curl -fL "https://github.com/${REPO}/releases/download/${VER}/adom-golden-${VER}-arm64.tar.gz" \
-            -o "/tmp/hd-golden-test/adom-golden-${VER}-arm64.tar.gz"
+            -o "/tmp/hydrogen-golden-test/adom-golden-${VER}-arm64.tar.gz"
         sudo rm -rf "${ROOT}"; sudo mkdir -p "${ROOT}"
-        sudo tar --numeric-owner -xzf "/tmp/hd-golden-test/adom-golden-${VER}-arm64.tar.gz" -C "${ROOT}"
+        sudo tar --numeric-owner -xzf "/tmp/hydrogen-golden-test/adom-golden-${VER}-arm64.tar.gz" -C "${ROOT}"
     fi
 fi
 

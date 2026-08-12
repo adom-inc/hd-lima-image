@@ -1,16 +1,16 @@
 ---
 name: golden-image-bake
-description: Rebuild + release the Adom Hydrogen golden Lima/nspawn rootfs image (adom-inc/hd-lima-image). Use when the user says "bake the golden image", "rebuild the lima image", "new golden image", "monthly image bake", "cut a new hd-lima-image version", or when CLI/extension/skill drift makes the shipped image stale (target cadence: monthly). EMPLOYEE-ONLY — needs an Adom cloud container with the private adom-hydrogen checkout; never publish this skill to the public image.
+description: Rebuild + release the Adom Hydrogen golden Lima/nspawn rootfs image (adom-inc/hydrogen-lima-image). Use when the user says "bake the golden image", "rebuild the lima image", "new golden image", "monthly image bake", "cut a new hydrogen-lima-image version", or when CLI/extension/skill drift makes the shipped image stale (target cadence: monthly). EMPLOYEE-ONLY — needs an Adom cloud container with the private adom-hydrogen checkout; never publish this skill to the public image.
 ---
 
-# Golden image bake — adom-inc/hd-lima-image
+# Golden image bake — adom-inc/hydrogen-lima-image
 
 Rebuilds the flat arm64 Rosetta-hybrid rootfs that Adom Hydrogen `machinectl import-tar`s, with
 everything pre-baked (apt baseline, code-server, claude CLI,
-Claude Code + adom-vscode extensions, VS Code settings, HD skills, the adom-wiki CLI +
-wiki-managed adom skills, Adom CLIs, adom-desktop CLI), then publishes it as a GitHub Release asset.
+Claude Code + adom-vscode extensions, VS Code settings, Hydrogen skills, the adom-wiki CLI +
+wiki-managed adom skills, Adom CLIs, adom-bridge CLI), then publishes it as a GitHub Release asset.
 
-Repo: `/home/adom/project/hd-lima-image` (github.com/adom-inc/hd-lima-image, public).
+Repo: `/home/adom/project/hydrogen-lima-image` (github.com/adom-inc/hydrogen-lima-image, public).
 Canonical recipe: `image/Dockerfile`; the chroot builder
 `scripts/build-rootfs.sh` is its docker-less translation (this container
 has no docker) — **keep them in lockstep** when editing either.
@@ -24,15 +24,15 @@ the reference for how it's wired.)
 
 ## (reference) workspace-updater daemon bake
 
-**Gate: ONLY after `feature/hd-auto-update` is merged into adom-hydrogen
+**Gate: ONLY after `the auto-update feature branch` is merged into adom-hydrogen
 `main`.** Check first: `git ls-tree -r --name-only origin/main -- \
-src-tauri/crates/hd-app/resources/workspace-updater/` — if it returns the
+src-tauri/crates/hydrogen-app/resources/workspace-updater/` — if it returns the
 files, the gate is open; if empty, SKIP this section (not merged yet).
 
-HD now ships an in-machine auto-updater. HD bootstraps it into the machine on
+Hydrogen now ships an in-machine auto-updater. Hydrogen bootstraps it into the machine on
 every launch (`ensure_workspace_updater`), so existing AND new users get it
 without an image change — baking it just means a fresh image has the daemon
-present before HD's first launch. **Part C invariant (HOLD IT):** the golden
+present before Hydrogen's first launch. **Part C invariant (HOLD IT):** the golden
 image is FIRST-INSTALL ONLY — never add anything that re-images or migrates
 an existing user's machine. All ongoing updates flow through the daemon in
 place; the image only benefits brand-new installs.
@@ -42,22 +42,22 @@ adom-vscode, adom-wiki + adom skills, CLIs — all of it stays). The daemon does
 the bake. Its **first** update installs the **Codex VS Code extension**
 (which we do NOT bake) and thereafter converges the container to the live
 manifest (SHA-verified, never-downgrade, surgical):
-`https://wiki.adom.inc/api/v1/pages/hd-workspace-tooling/files/manifest.json`
+`https://wiki.adom.inc/api/v1/pages/hydrogen-workspace-tooling/files/manifest.json`
 
 Source (adom-hydrogen main, post-merge):
-`src-tauri/crates/hd-app/resources/workspace-updater/`
+`src-tauri/crates/hydrogen-app/resources/workspace-updater/`
   - `adom-workspace-updater.sh`      → `/usr/local/bin/adom-workspace-updater` (chmod +x)
   - `adom-workspace-updater.service` → `/etc/systemd/system/`
   - `adom-workspace-updater.timer`   → `/etc/systemd/system/` (then `systemctl enable`)
   - `README.md` — reference only, do NOT ship into the image
 
 Implementation (apply when the gate opens), in lockstep across all three:
-1. **CI** `.github/workflows/build.yml` — extend the HD sparse-checkout to
+1. **CI** `.github/workflows/build.yml` — extend the Hydrogen sparse-checkout to
    also stage the updater dir alongside `skills/public-facing`, copy it to
    `image/workspace-updater/`.
 2. **chroot** `scripts/build-rootfs.sh` — stage from the local checkout:
-   `sudo cp -r ~/project/adom-hydrogen/src-tauri/crates/hd-app/resources/workspace-updater "${ROOT}/tmp/"`
-3. **`image/bake-hd-setup.sh`** — new step (runs as root):
+   `sudo cp -r ~/project/hydrogen-macos/src-tauri/crates/hydrogen-app/resources/workspace-updater "${ROOT}/tmp/"`
+3. **`image/bake-hydrogen-setup.sh`** — new step (runs as root):
    ```bash
    install -m 0755 /tmp/workspace-updater/adom-workspace-updater.sh /usr/local/bin/adom-workspace-updater
    install -m 0644 /tmp/workspace-updater/adom-workspace-updater.service /etc/systemd/system/
@@ -76,17 +76,17 @@ Implementation (apply when the gate opens), in lockstep across all three:
 
 ## Preconditions
 
-- `~/project/adom-hydrogen` exists (HD skills source; pull main for releases)
+- `~/project/hydrogen-macos` exists (Hydrogen skills source; pull main for releases)
 - ~8 GB free under `/tmp` (`df -h /tmp`)
-- No other bake running (`pgrep -f build-rootfs.sh` — shared `/tmp/hd-golden-build` workdir)
+- No other bake running (`pgrep -f build-rootfs.sh` — shared `/tmp/hydrogen-golden-build` workdir)
 
 ## Procedure
 
 **Preferred path — CI (real docker, full smoke incl. native claude verify):**
 
 ```bash
-cd /home/adom/project/hd-lima-image && git pull --ff-only
-gh release list --repo adom-inc/hd-lima-image     # pick next vN
+cd /home/adom/project/hydrogen-lima-image && git pull --ff-only
+gh release list --repo adom-inc/hydrogen-lima-image     # pick next vN
 gh workflow run build-golden-image -f version=vN
 gh run watch $(gh run list --workflow build-golden-image --limit 1 --json databaseId -q '.[0].databaseId') --exit-status
 # CI does build + smoke + release + ghcr push. Then SKIP to step 5 (verify).
@@ -96,36 +96,36 @@ gh run watch $(gh run list --workflow build-golden-image --limit 1 --json databa
 **Fallback path — local chroot build** (CI down, or iterating on the recipe):
 
 ```bash
-cd /home/adom/project/hd-lima-image
+cd /home/adom/project/hydrogen-lima-image
 git pull --ff-only
 
 # 1. Next version: current releases, then increment
-gh release list --repo adom-inc/hd-lima-image
+gh release list --repo adom-inc/hydrogen-lima-image
 
 # 2. Build (~20 min). ALWAYS in background with a log; gate on SMOKE-OK.
-GOLDEN_VERSION=vN ./scripts/build-rootfs.sh > /tmp/hd-golden-build.log 2>&1 &
+GOLDEN_VERSION=vN ./scripts/build-rootfs.sh > /tmp/hydrogen-golden-build.log 2>&1 &
 ```
 
-Monitor `/tmp/hd-golden-build.log` for `[build-rootfs ...]` / `[bake-hd-setup ...]`
+Monitor `/tmp/hydrogen-golden-build.log` for `[build-rootfs ...]` / `[bake-hydrogen-setup ...]`
 phase lines. Known-benign noise: `E: Can not write log (Is /dev/pts mounted?)`
 (apt in a mount-less chroot). Hard failures print `MISSING ...` / `LEAK ...`
 from the smoke test — the build exits non-zero; do NOT release.
 
 ```bash
 # 3. Verify the build said SMOKE-OK and produced artifacts
-grep SMOKE-OK /tmp/hd-golden-build.log
-ls -lh /tmp/hd-golden-build/adom-golden-vN-arm64.tar.gz*
+grep SMOKE-OK /tmp/hydrogen-golden-build.log
+ls -lh /tmp/hydrogen-golden-build/adom-golden-vN-arm64.tar.gz*
 
 # 4. Release (fix the sha256 file to a bare filename first)
-cd /tmp/hd-golden-build
-sed -i 's|/tmp/hd-golden-build/||' adom-golden-vN-arm64.tar.gz.sha256
+cd /tmp/hydrogen-golden-build
+sed -i 's|/tmp/hydrogen-golden-build/||' adom-golden-vN-arm64.tar.gz.sha256
 gh release create vN adom-golden-vN-arm64.tar.gz adom-golden-vN-arm64.tar.gz.sha256 \
-  --repo adom-inc/hd-lima-image --title "Golden Lima/nspawn rootfs (arm64) vN" \
+  --repo adom-inc/hydrogen-lima-image --title "Golden Lima/nspawn rootfs (arm64) vN" \
   --notes "<what changed since the last bake>"
 
 # 5. Verify the public download + hash (NEVER skip — release ≠ verified)
 curl -fsSL -o /tmp/verify.tar.gz \
-  "https://github.com/adom-inc/hd-lima-image/releases/download/vN/adom-golden-vN-arm64.tar.gz"
+  "https://github.com/adom-inc/hydrogen-lima-image/releases/download/vN/adom-golden-vN-arm64.tar.gz"
 sha256sum /tmp/verify.tar.gz   # must equal the .sha256 asset
 rm -f /tmp/verify.tar.gz
 ```
@@ -148,12 +148,12 @@ that validates systemd/timer/daemon, so it doubles as the visual.
 If the Mac/Lima is unreachable, say so and defer the visual — do NOT fall
 back to proot in the container.
 
-## Hand-off to HD
+## Hand-off to Hydrogen
 
-HD consumes the image via three consts in
-`adom-hydrogen/src-tauri/crates/hd-app/src/runtime/macos.rs`:
+Hydrogen consumes the image via three consts in
+`adom-hydrogen/src-tauri/crates/hydrogen-app/src/runtime/macos.rs`:
 `TARBALL_URL`, `TARBALL_SHA256`, `TARBALL_VERSION` (e.g. `vN-arm64`).
-After releasing, give the HD thread the new URL + sha256 + version so it
+After releasing, give the Hydrogen thread the new URL + sha256 + version so it
 bumps the pins (existing installs migrate via `migrate_to_new_tarball`).
 
 ## Invariants (smoke-tested; never regress)

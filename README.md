@@ -1,8 +1,8 @@
-# hd-lima-image — golden Lima/nspawn rootfs (arm64 Rosetta-hybrid) for Adom Hydrogen on macOS
+# hydrogen-lima-image — golden Lima/nspawn rootfs (arm64 Rosetta-hybrid) for Adom Hydrogen on macOS
 
 Builds the **golden image** that Adom Hydrogen imports via
 `machinectl import-tar Adom-Workspace adom-golden-<ver>-arm64.tar.gz` — booting it as
-a **systemd-nspawn machine** inside an HD-owned **Lima** utility VM (`vmType: vz`,
+a **systemd-nspawn machine** inside an Hydrogen-owned **Lima** utility VM (`vmType: vz`,
 Apple Virtualization.framework, arm64 + Rosetta).
 
 macOS sibling of [`hd-wsl2-image`](https://github.com/adom-inc/hd-wsl2-image) (the
@@ -21,8 +21,8 @@ ship as new image versions (monthly bake), not git pulls.
 | **claude CLI** at `~/.local/bin/claude` + PATH (step 15) | `inject-api-key` — Adom session token (step 6) |
 | **Claude Code extension** from Open VSX (step 16) | relay start + tests (steps 9, 11–14) |
 | **adom-vscode binary + extension** registered with code-server (step 3) | `claude-auth` — user OAuth (step 17) |
-| **HD self-awareness skills** shared/ + machine/ (step 8) | `welcome` (step 18) |
-| **adom-desktop CLI** latest published (step 10) | `adom-host` alias (per machine start) |
+| **Hydrogen self-awareness skills** shared/ + machine/ (step 8) | `welcome` (step 18) |
+| **adom-bridge CLI** latest published (step 10) | `adom-host` alias (per machine start) |
 | Adom CLIs from the public wiki: adom-cli, adom-wiki, adom-vscode, adom-mouser, adom-digikey, adom-jlcpcb, adom-parts-search, adom-gchat | per-user state: Carbon API key, wiki token |
 | `adom` user 1001 + sudoers + systemd linger (systemd-nspawn boots systemd as PID1) | |
 
@@ -42,13 +42,13 @@ See `skills/golden-image-bake/SKILL.md` for the full monthly procedure.
 `image/Dockerfile` is the canonical recipe; `scripts/build-rootfs.sh` is its
 docker-less translation. **Keep them in lockstep.**
 
-## Consuming from HD
+## Consuming from Hydrogen
 
-Pin in `hd-app/src/runtime/macos.rs`:
+Pin in `hydrogen-app/src/runtime/macos.rs`:
 
 ```rust
 pub const TARBALL_URL: &str =
-    "https://github.com/adom-inc/hd-lima-image/releases/download/<ver>/adom-golden-<ver>-arm64.tar.gz";
+    "https://github.com/adom-inc/hydrogen-lima-image/releases/download/<ver>/adom-golden-<ver>-arm64.tar.gz";
 pub const TARBALL_SHA256: &str = "<from the .sha256 asset>";
 pub const TARBALL_VERSION: &str = "<ver>-arm64";
 ```

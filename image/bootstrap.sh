@@ -7,7 +7,7 @@
 # is demoted to a best-effort UPDATER: refresh CLIs/skills from the wiki
 # when an installer script is published there.
 #
-# It must NEVER fail HD setup — the image is self-sufficient without it.
+# It must NEVER fail Hydrogen setup — the image is self-sufficient without it.
 # Always exits 0.
 #
 # Note: as of 2026-06-11 install.mjs is NOT published at the wiki static

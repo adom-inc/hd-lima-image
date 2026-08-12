@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# bake-hd-setup.sh — pre-run HD's setup cascade at IMAGE BUILD time.
+# bake-hydrogen-setup.sh — pre-run Hydrogen's setup cascade at IMAGE BUILD time.
 #
 # Run as root inside the rootfs (chroot or docker RUN). Each section names
 # the setup step it subsumes in
-# adom-hydrogen/src-tauri/crates/hd-app/src/setup_steps_macos.rs — keep
+# adom-hydrogen/src-tauri/crates/hydrogen-app/src/setup_steps_macos.rs — keep
 # the two in lockstep. With these baked, the runtime cascade reduces to the
 # machine/user-specific steps only: ensure-workspace (machinectl import-tar),
 # wait-codeserver, set-env-vars (live proxy port), inject-api-key,
-# ensure-adom-desktop (host side), start-relay/test-* (relay), claude-auth,
+# ensure-adom-bridge (host side), start-relay/test-* (relay), claude-auth,
 # and welcome.
 #
 # NOTHING here may require GitHub authentication — this image is public and
@@ -17,7 +17,7 @@
 # is the official wiki CLI; adompkg is RETIRED and no longer ships in the image).
 
 set -euo pipefail
-log() { echo "[bake-hd-setup] $*"; }
+log() { echo "[bake-hydrogen-setup] $*"; }
 as_adom() { runuser -u adom -- bash -lc "$1"; }
 
 WIKI_BASE="${WIKI_BASE:-https://wiki-ufypy5dpx93o.adom.cloud}"
@@ -98,7 +98,7 @@ as_adom "$CS --list-extensions --show-versions 2>/dev/null | grep -qi \"claude-c
 # does NOT register with code-server (proven 2026-05-31) — register the
 # .vsix explicitly, then verify, exactly like the cascade.
 log "step 3: adom-vscode extension — NOT baked (slim image)"
-# SLIM (Kyle 2026-08-05): the converge (install-hd-skills -> hd-bootstrap postinstall)
+# SLIM (Kyle 2026-08-05): the converge (install-hydrogen-skills -> hydrogen-bootstrap postinstall)
 # installs + registers the adom-vscode extension at first install. Baking it required
 # EXECUTING the x86-64 CLI, which no Rosetta-less bake env (CI docker, plain chroot)
 # can do — and it was redundant with the converge anyway.
@@ -110,7 +110,7 @@ log "step 3: adom-vscode extension — NOT baked (slim image)"
 # editor opens VS Code's built-in "Build with Agent" chat panel (caught
 # by pup visual test 2026-06-11). Note: NO model pin — Claude Code picks
 # the default model itself.
-# ⚠ If HD's runtime configure-vscode step still rewrites settings.json,
+# ⚠ If Hydrogen's runtime configure-vscode step still rewrites settings.json,
 # its payload in setup_steps_macos.rs must gain these keys too, or first
 # launch resurrects the chat panel.
 log "configure-vscode: settings.json"
@@ -150,7 +150,7 @@ SETTINGS
 chown adom:adom /home/adom/.local/share/code-server/User/settings.json
 
 # code-server's own update-check nags ("v4.x has been released!") —
-# disable via config.yaml (caught by pup visual test 2026-06-11). HD's
+# disable via config.yaml (caught by pup visual test 2026-06-11). Hydrogen's
 # code-server start command should also pass --disable-update-check.
 install -d -o adom -g adom -m 0755 /home/adom/.config/code-server
 cat > /home/adom/.config/code-server/config.yaml <<'CSCONF'
@@ -171,7 +171,7 @@ chown adom:adom /home/adom/.config/code-server/config.yaml
 #      interactive :8821 hide-activitybar step. Seeded ONCE per profile
 #      (adom.activityBarSeeded marker) so a user who deliberately re-pins
 #      them is never fought. First-ever paint can race VS Code's startup
-#      read — any reload (HD's setup reloads the iframe anyway) applies it.
+#      read — any reload (Hydrogen's setup reloads the iframe anyway) applies it.
 log "configure-vscode: workbench.html state seed (trusted domains + activity bar)"
 WB=/usr/lib/code-server/lib/vscode/out/vs/code/browser/workbench/workbench.html
 python3 - "$WB" <<'PY'
@@ -190,21 +190,21 @@ SCRIPT = ('<script>(function(){try{var r=indexedDB.open("vscode-web-state-db-glo
  'if(f){f.pinned=false}else{arr.push({id:id,pinned:false,visible:false})}});'
  'try{var t2=d.transaction("ItemTable","readwrite");var o2=t2.objectStore("ItemTable");'
  'o2.put(JSON.stringify(arr),"workbench.activity.pinnedViewlets2");o2.put("1","adom.activityBarSeeded")}catch(_){}}}}catch(_){}};'
- 'window.__hdTrustedDomains=1;window.__hdAbSeed=1}catch(_){}})();</script>')
-if '__hdAbSeed' not in html:
+ 'window.__hydrogenTrustedDomains=1;window.__hydrogenAbSeed=1}catch(_){}})();</script>')
+if '__hydrogenAbSeed' not in html:
     html = html.replace('</head>', SCRIPT + '</head>')
     open(wb, 'w').write(html)
 PY
-grep -q __hdTrustedDomains "$WB"
+grep -q __hydrogenTrustedDomains "$WB"
 grep -q adom.activityBarSeeded "$WB"
 
-# The IndexedDB seed above is DEFEATED on macOS: HD's WKWebView loads code-server as a
+# The IndexedDB seed above is DEFEATED on macOS: Hydrogen's WKWebView loads code-server as a
 # cross-origin iframe, whose partitioned third-party IndexedDB never reaches the store
-# the trusted-domains validator reads. HD patches product.json per-launch as the fix,
+# the trusted-domains validator reads. Hydrogen patches product.json per-launch as the fix,
 # but a FRESH image's very first session loads the workbench before that patch+restart
 # and keeps the unpatched list in memory — the "open external website?" dialog fires
 # exactly once, during first-boot Claude sign-in (Kyle, 2026-07-28). Bake the patch so
-# the first byte code-server ever serves is already trusted; HD's per-launch converge
+# the first byte code-server ever serves is already trusted; Hydrogen's per-launch converge
 # then no-ops forever.
 python3 - /usr/lib/code-server/lib/vscode/product.json <<'PY'
 import json, sys
@@ -218,14 +218,14 @@ if "*" not in a:
 PY
 python3 -c 'import json,sys; sys.exit(0 if "*" in json.load(open("/usr/lib/code-server/lib/vscode/product.json")).get("linkProtectionTrustedDomains", []) else 1)'
 
-# ── step 8: install-hd-skills ──────────────────────────────────────────────
+# ── step 8: install-hydrogen-skills ──────────────────────────────────────────────
 # Builder stages adom-hydrogen/skills/public-facing/{shared,machine} at
-# /tmp/hd-skills. Flat install, shared + machine buckets only (never docker/).
-log "step 8: HD self-awareness skills"
-if [ -d /tmp/hd-skills ]; then
+# /tmp/hydrogen-skills. Flat install, shared + machine buckets only (never docker/).
+log "step 8: Hydrogen self-awareness skills"
+if [ -d /tmp/hydrogen-skills ]; then
     count=0
     for bucket in shared machine; do
-        for d in /tmp/hd-skills/${bucket}/hd-*/; do
+        for d in /tmp/hydrogen-skills/${bucket}/hydrogen-*/; do
             [ -f "${d}SKILL.md" ] || continue
             name="$(basename "$d")"
             # NOTE: `install -D -o adom -g adom` applies the owner to the FILE
@@ -237,61 +237,67 @@ if [ -d /tmp/hd-skills ]; then
             count=$((count + 1))
         done
     done
-    rm -rf /tmp/hd-skills
-    log "  installed ${count} HD skills"
+    rm -rf /tmp/hydrogen-skills
+    log "  installed ${count} Hydrogen skills"
     [ "$count" -gt 0 ]
 else
-    log "  /tmp/hd-skills not staged — skipping (non-fatal, mirrors the cascade)"
+    log "  /tmp/hydrogen-skills not staged — skipping (non-fatal, mirrors the cascade)"
 fi
 
-# ── step 10: verify-adom-desktop (CLI half) ───────────────────────────────
-# Latest published AD CLI via version.json (wiki v2 → v1 mirror fallback),
-# same resolution order as ad_install::resolve_latest_ad.
-log "step 10: adom-desktop CLI"
-VJ="$(curl -fsSL https://git-wiki-ktqxite5iglh.adom.cloud/api/v1/pages/adom-desktop/files/version.json 2>/dev/null \
-   || curl -fsSL "${WIKI_BASE}/static/apps/adom-desktop/version.json")"
-AD_URL="$(echo "$VJ" | jq -r '.cli.linux_x86_64.binary_url')"
-# The manifest's binary_url has been observed to 404 (upstream AD manifest bug,
-# 2026-07-17) — fall back to the wiki static path the other CLIs install from.
-if [ -z "$AD_URL" ] || [ "$AD_URL" = "null" ] \
-   || ! curl -fsSL "$AD_URL" -o /usr/local/bin/adom-desktop 2>/dev/null; then
-    log "  manifest binary_url unusable — falling back to ${WIKI_BASE}/static/apps/adom-desktop/adom-desktop"
-    curl -fsSL "${WIKI_BASE}/static/apps/adom-desktop/adom-desktop" -o /usr/local/bin/adom-desktop
+# ── step 10: verify-adom-bridge (CLI half) ───────────────────────────────
+# Since the 2026-08 naming migration the Linux CLI is no longer published on
+# the wiki — the builder STAGES the freshly built x86-64 binary at
+# /tmp/adom-bridge/adom-bridge (built from adom-inc/bridge-macos cli/).
+# Wiki version.json (pages/adom-bridge, cli.linux_x86_64.binary_url) is the
+# fallback once bridge-macos publishing resumes shipping a Linux CLI.
+log "step 10: adom-bridge CLI"
+if [ -f /tmp/adom-bridge/adom-bridge ]; then
+    install -m 0755 /tmp/adom-bridge/adom-bridge /usr/local/bin/adom-bridge
+    rm -rf /tmp/adom-bridge
+    log "  staged adom-bridge binary installed"
+else
+    VJ="$(curl -fsSL "https://wiki.adom.inc/api/v1/pages/adom-bridge/files/version.json")"
+    BRIDGE_URL="$(echo "$VJ" | jq -r '.cli.linux_x86_64.binary_url')"
+    if [ -z "$BRIDGE_URL" ] || [ "$BRIDGE_URL" = "null" ] \
+       || ! curl -fsSL "$BRIDGE_URL" -o /usr/local/bin/adom-bridge 2>/dev/null; then
+        echo "bake: no staged /tmp/adom-bridge/adom-bridge and no linux_x86_64 binary in the wiki manifest — stage the CLI (see BRIDGE_CLI_SRC in build-rootfs.sh)" >&2
+        exit 1
+    fi
 fi
-chmod 0755 /usr/local/bin/adom-desktop
-# A stale ~/.local/bin/adom-desktop (occasionally left by older installers)
+chmod 0755 /usr/local/bin/adom-bridge
+# A stale ~/.local/bin/adom-bridge (occasionally left by older installers)
 # would shadow /usr/local/bin in PATH — remove it.
-rm -f /home/adom/.local/bin/adom-desktop
+rm -f /home/adom/.local/bin/adom-bridge
 # Exec-verify only when the binary's arch matches the bake env (x86-64 CLI runs
 # under Rosetta at RUNTIME; a Rosetta-less bake env can't exec it — file check there).
 # e_machine byte: b7=aarch64, 3e=x86-64 (od is coreutils — `file` may be absent)
-BIN_MACHINE="$(od -An -tx1 -j18 -N1 /usr/local/bin/adom-desktop | tr -d ' ')"
+BIN_MACHINE="$(od -An -tx1 -j18 -N1 /usr/local/bin/adom-bridge | tr -d ' ')"
 WANT_MACHINE="$([ "$(uname -m)" = aarch64 ] && echo b7 || echo 3e)"
 if [ "$BIN_MACHINE" = "$WANT_MACHINE" ]; then
-    as_adom 'adom-desktop --version'
+    as_adom 'adom-bridge --version'
 else
-    test -s /usr/local/bin/adom-desktop || { echo 'adom-desktop download produced an empty file' >&2; exit 1; }
-    log "  adom-desktop staged (x86-64; exec-verify deferred to runtime Rosetta)"
+    test -s /usr/local/bin/adom-bridge || { echo 'adom-bridge download produced an empty file' >&2; exit 1; }
+    log "  adom-bridge staged (x86-64; exec-verify deferred to runtime Rosetta)"
 fi
 
-# ── HD in-machine workspace-updater daemon (Part B of HD auto-update) ───────
+# ── Hydrogen in-machine workspace-updater daemon (Part B of Hydrogen auto-update) ───────
 # Staged at /tmp/workspace-updater by the builder (CI sparse-checkout / chroot
 # cp from adom-hydrogen main). GUARDED: if absent (pre-merge of
-# feature/hd-auto-update), skip cleanly so the monthly cron never breaks; once
+# the auto-update feature branch), skip cleanly so the monthly cron never breaks; once
 # the files are on main, the bake installs the daemon so a FRESH image has it
-# before HD's first launch. HD also bootstraps it into EXISTING machines via
+# before Hydrogen's first launch. Hydrogen also bootstraps it into EXISTING machines via
 # ensure_workspace_updater every launch — so this bake is purely first-install.
 # The daemon's FIRST run installs the Codex VS Code extension, then converges
 # the workspace to the wiki manifest (SHA-verified, never-downgrade, surgical).
 # Codex is NOT baked — the daemon adds it at runtime.
 if [ -f /tmp/workspace-updater/adom-workspace-updater.sh ]; then
-    log "workspace-updater daemon (HD auto-update)"
+    log "workspace-updater daemon (Hydrogen auto-update)"
     # LF-only (source is LF; install preserves bytes). chmod +x the script.
     install -m 0755 /tmp/workspace-updater/adom-workspace-updater.sh /usr/local/bin/adom-workspace-updater
     install -m 0644 /tmp/workspace-updater/adom-workspace-updater.service /etc/systemd/system/adom-workspace-updater.service
     install -m 0644 /tmp/workspace-updater/adom-workspace-updater.timer   /etc/systemd/system/adom-workspace-updater.timer
     # README.md intentionally NOT shipped.
-    # HARDEN the timer at bake time so the image is correct regardless of which HD branch the
+    # HARDEN the timer at bake time so the image is correct regardless of which Hydrogen branch the
     # builder pulled the source from (John 2026-06-15): the updater MUST NOT run during boot.
     # Persistent=true made systemd treat the never-run timer as "missed" on a fresh import and fire
     # it IMMEDIATELY at boot (dpkg -i code-server + ext installs in the core boot path → is-system-
@@ -312,7 +318,7 @@ if [ -f /tmp/workspace-updater/adom-workspace-updater.sh ]; then
     rm -rf /tmp/workspace-updater
     log "  daemon $(/usr/local/bin/adom-workspace-updater --version 2>/dev/null) installed + timer enabled"
 else
-    log "workspace-updater not staged — skipping (pre-merge of feature/hd-auto-update)"
+    log "workspace-updater not staged — skipping (pre-merge of the auto-update feature branch)"
 fi
 
 # ── cron: a first-class scheduling service for anyone in this machine ──────────
@@ -331,9 +337,9 @@ systemctl enable cron.service 2>/dev/null || {
 
 # ── adom-wiki — the official wiki CLI (successor to the RETIRED adompkg) ────
 # Staged at /tmp/adom-wiki by the builder: the NATIVE arm64 build (the same binary
-# HD bundles in the .app and installs at setup via install_adom_wiki_in_workspace),
+# Hydrogen bundles in the .app and installs at setup via install_adom_wiki_in_workspace),
 # so package operations in the machine run natively — no Rosetta. Installed to
-# ~/.local/bin/adom-wiki, the exact path the HD cascade converges (idempotent
+# ~/.local/bin/adom-wiki, the exact path the Hydrogen cascade converges (idempotent
 # overwrite at runtime keeps it fresh). Default registry is wiki.adom.inc — no
 # env pin needed (the ADOMPKG_REGISTRY pin died with adompkg).
 if [ -f /tmp/adom-wiki/adom-wiki ]; then
@@ -363,8 +369,8 @@ fi
 
 # ── (SLIM IMAGE, Kyle 2026-08-05) ──────────────────────────────────────────
 # The wiki-managed skills layer (adom/hydrogen-mac-bootstrap, adom/core tree, the
-# adom/hook auto-updater) is NOT baked: the HD install cascade installs it all
-# fresh from the wiki on every install (install-hd-skills), and a fresh pkg
+# adom/hook auto-updater) is NOT baked: the Hydrogen install cascade installs it all
+# fresh from the wiki on every install (install-hydrogen-skills), and a fresh pkg
 # install runs every package's install script — so baking it here was pure
 # redundancy + drift. adom-wiki CLI + adom-google (not in the cascade tree)
 # stay baked above.

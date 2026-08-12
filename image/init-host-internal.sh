@@ -4,7 +4,7 @@
 # inside the workspace.
 #
 # macOS/Lima model: the workspace runs as a systemd-nspawn machine sharing the
-# network of an HD-owned Lima vz VM. Apple's Virtualization.framework does NOT
+# network of an Hydrogen-owned Lima vz VM. Apple's Virtualization.framework does NOT
 # mirror the host loopback (unlike WSL's mirrored mode), so host services are
 # reached via the VM's gateway, exposed in the machine as `adom-host`.
 #

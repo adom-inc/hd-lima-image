@@ -138,8 +138,8 @@ COPY bootstrap.sh /opt/adom/bootstrap.sh
 RUN chmod +x /etc/init-host-internal.sh /opt/adom/bootstrap.sh \
     && chown -R adom:adom /opt/adom
 
-# SLIM IMAGE (Kyle 2026-08-05): HD skills + workspace-updater are NOT baked.
-# The install cascade pulls skills fresh from the wiki; HD ensures the updater
+# SLIM IMAGE (Kyle 2026-08-05): Hydrogen skills + workspace-updater are NOT baked.
+# The install cascade pulls skills fresh from the wiki; Hydrogen ensures the updater
 # daemon per-launch. This also removes CI's private-repo (HD_REPO_TOKEN) need.
 # adom-wiki CLI (native arm64; official wiki package manager — adompkg RETIRED).
 # Fetched ANONYMOUSLY from the wiki's own release assets (no private-repo need).
@@ -149,22 +149,26 @@ RUN mkdir -p /tmp/adom-wiki \
          -o /tmp/adom-wiki/adom-wiki \
     && chmod 0755 /tmp/adom-wiki/adom-wiki
 
-# bake-hd-setup.sh pre-runs HD's setup cascade (claude CLI, Claude Code +
-# adom-vscode extensions, VS Code settings + trusted domains, HD skills,
-# adom-desktop CLI, wiki-managed installs via adom-wiki) — shared verbatim with
+# bake-hydrogen-setup.sh pre-runs Hydrogen's setup cascade (claude CLI, Claude Code +
+# adom-vscode extensions, VS Code settings + trusted domains, Hydrogen skills,
+# adom-bridge CLI, wiki-managed installs via adom-wiki) — shared verbatim with
 # scripts/build-rootfs.sh. public-scrub.sh then removes any stale-detector
 # update hook and other GitHub-auth assumptions; updates arrive as new image
 # versions, not git pulls.
 USER root
-COPY bake-hd-setup.sh /tmp/bake-hd-setup.sh
-RUN bash /tmp/bake-hd-setup.sh && rm -f /tmp/bake-hd-setup.sh
+# adom-bridge CLI (x86-64 linux) — build context must stage it at
+# adom-bridge/adom-bridge (built from adom-inc/bridge-macos cli/); the wiki
+# no longer publishes a Linux CLI, so step 10 hard-requires this staging.
+COPY adom-bridge/ /tmp/adom-bridge/
+COPY bake-hydrogen-setup.sh /tmp/bake-hydrogen-setup.sh
+RUN bash /tmp/bake-hydrogen-setup.sh && rm -f /tmp/bake-hydrogen-setup.sh
 
 COPY public-scrub.sh /tmp/public-scrub.sh
 RUN bash /tmp/public-scrub.sh && rm -f /tmp/public-scrub.sh
 
 # Phase A of the legacy bootstrap (apt baseline + code-server) is fully baked
 # above — write its sentinel so any older bootstrap.sh that still checks it
-# skips cleanly. /etc/adom-golden-version is for diagnostics + HD's tarball
+# skips cleanly. /etc/adom-golden-version is for diagnostics + Hydrogen's tarball
 # migration logic.
 USER root
 RUN mkdir -p /var/lib/adom-bootstrap \
@@ -177,6 +181,6 @@ WORKDIR /home/adom
 EXPOSE 8080
 
 # Never `docker run` in production — the rootfs is exported for `machinectl import-tar`.
-# The CMD documents the entrypoint HD starts inside the machine.
+# The CMD documents the entrypoint Hydrogen starts inside the machine.
 CMD ["code-server", "--bind-addr", "0.0.0.0:8080", "--auth", "none", \
      "--disable-telemetry", "--disable-update-check", "/home/adom/project"]

@@ -1,7 +1,7 @@
 name: build-golden-image
 
 # Builds the golden Lima/nspawn rootfs (arm64 Rosetta-hybrid), smoke-tests it, then publishes it two ways:
-#   1. GitHub Release asset  — the flat .tar.gz that HD's MacosVmRuntime
+#   1. GitHub Release asset  — the flat .tar.gz that Hydrogen's MacosVmRuntime
 #      downloads and feeds to `machinectl import-tar` (primary distribution channel;
 #      public repo → anonymous HTTPS download).
 #   2. ghcr.io single-layer image — `docker import` of the same rootfs, so
@@ -32,7 +32,7 @@ jobs:
       # adom-inc/adom-hydrogen stored as the HD_REPO_TOKEN repo secret.
       # .git is stripped: the public image must not carry the private
       # remote or require auth.
-      # (SLIM IMAGE, Kyle 2026-08-05: no HD-skills/updater snapshot — the image no
+      # (SLIM IMAGE, Kyle 2026-08-05: no Hydrogen-skills/updater snapshot — the image no
       #  longer bakes them, which also removes the HD_REPO_TOKEN private-repo need.)
       - name: Build image
         run: |

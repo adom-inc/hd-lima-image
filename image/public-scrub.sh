@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# public-scrub.sh — run as root inside the rootfs after the HD setup bake.
+# public-scrub.sh — run as root inside the rootfs after the Hydrogen setup bake.
 #
 # This image ships to the public. Strip everything that phones home to
 # private infra or assumes GitHub auth:
@@ -16,7 +16,7 @@
 #
 #     NOTE the del(.model) below is bake-time only, so it does NOT hold: adom/hook
 #     re-installs on every `adom-wiki pkg update` (the auto-updater kept below) and
-#     the only-if-absent write refills the key days after the image ships. HD sets
+#     the only-if-absent write refills the key days after the image ships. Hydrogen sets
 #     ADOM_HOOK_NO_MODEL_DEFAULT=1 machine-wide at launch, which is what actually
 #     keeps it unpinned; deleting alone just feeds the refill.
 #   - bake-time update stamps under ~/.adom
@@ -52,14 +52,14 @@ fi
 # so the image ships unpinned and drifts back to pinned within a day of normal use.
 # Three files because the hook can fire from three shell paths: PAM/nspawn services
 # (/etc/environment), login shells (profile.d), and code-server's interactive
-# non-login terminal (.bashrc). Idempotent; HD asserts the same thing at launch, so
+# non-login terminal (.bashrc). Idempotent; Hydrogen asserts the same thing at launch, so
 # an image baked before this still self-heals.
 grep -q '^ADOM_HOOK_NO_MODEL_DEFAULT=' /etc/environment 2>/dev/null \
     || echo 'ADOM_HOOK_NO_MODEL_DEFAULT=1' >> /etc/environment
 printf '%s\n' \
     '# Public image: Claude Code picks its own default model (adom/hook opt-out).' \
-    'export ADOM_HOOK_NO_MODEL_DEFAULT=1' > /etc/profile.d/hd-no-model-pin.sh
-chmod 0644 /etc/profile.d/hd-no-model-pin.sh
+    'export ADOM_HOOK_NO_MODEL_DEFAULT=1' > /etc/profile.d/hydrogen-no-model-pin.sh
+chmod 0644 /etc/profile.d/hydrogen-no-model-pin.sh
 if [[ -f /home/adom/.bashrc ]] && ! grep -q ADOM_HOOK_NO_MODEL_DEFAULT /home/adom/.bashrc; then
     echo 'export ADOM_HOOK_NO_MODEL_DEFAULT=1  # Claude Code picks its own model' >> /home/adom/.bashrc
 fi
