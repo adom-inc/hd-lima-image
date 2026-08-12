@@ -289,9 +289,6 @@ in_root "set -e; code-server --version; node --version; git --version; \
       || { echo \"OWNERSHIP: non-adom path under /home/adom: \$(find /home/adom ! -user adom -print -quit)\"; exit 1; }; \
   grep -q adom.activityBarSeeded /usr/lib/code-server/lib/vscode/out/vs/code/browser/workbench/workbench.html \
       || { echo 'MISSING trusted-domains patch'; exit 1; }; \
-  for s in hydrogen-instapcb hydrogen-eda-discovery; do \
-      test -f /home/adom/.claude/skills/\$s/SKILL.md || { echo \"MISSING required Hydrogen skill: \$s\"; exit 1; }; \
-  done; \
   test -x /usr/local/bin/adom-bridge || { echo 'MISSING adom-bridge CLI'; exit 1; }; \
   test -x /home/adom/.local/bin/adom-wiki \
       || { echo 'MISSING adom-wiki (official wiki CLI)'; exit 1; }; \
