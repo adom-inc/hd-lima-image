@@ -60,7 +60,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
        > /etc/apt/sources.list.d/github-cli.list \
     && apt-get update && apt-get install -y --no-install-recommends gh \
-    && curl -fsSL "https://github.com/coder/code-server/releases/download/v${CODE_SERVER_VERSION}/code-server_${CODE_SERVER_VERSION}_$(dpkg --print-architecture).deb" \
+    && curl -fsSL --retry 5 --retry-all-errors "https://github.com/coder/code-server/releases/download/v${CODE_SERVER_VERSION}/code-server_${CODE_SERVER_VERSION}_$(dpkg --print-architecture).deb" \
        -o /tmp/code-server.deb \
     && dpkg -i /tmp/code-server.deb \
     && sed -i 's/# en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen \

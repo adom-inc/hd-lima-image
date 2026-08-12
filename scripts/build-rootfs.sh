@@ -91,7 +91,7 @@ in_root "curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gp
   && apt-get update && apt-get install -y --no-install-recommends gh"
 
 log "code-server ${CSV}"
-in_root "curl -fsSL \"https://github.com/coder/code-server/releases/download/v${CSV}/code-server_${CSV}_\$(dpkg --print-architecture).deb\" -o /tmp/code-server.deb \
+in_root "curl -fsSL --retry 5 --retry-all-errors \"https://github.com/coder/code-server/releases/download/v${CSV}/code-server_${CSV}_\$(dpkg --print-architecture).deb\" -o /tmp/code-server.deb \
   && dpkg -i /tmp/code-server.deb && rm -f /tmp/code-server.deb"
 
 log "locale"
