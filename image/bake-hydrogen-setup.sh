@@ -79,7 +79,7 @@ as_adom 'rm -rf ~/.claude/downloads'
 # adom-hydrogen setup_steps_macos.rs (the runtime enforcement) — bump both
 # together after verifying a new version renders.
 CLAUDE_EXT_PIN="2.1.218"
-log "step 16: Claude Code extension (Open VSX, floor ${CLAUDE_EXT_PIN}, auto-update ON)"
+log "step 16: Claude Code extension (Open VSX, floor ${CLAUDE_EXT_PIN}, auto-update OFF (2026-08-05 slim doctrine: silent ext updates blank the panel))"
 # Install from the exact .vsix, NOT `ext@version`: code-server's CLI has been seen
 # resolving/updating to LATEST despite the @pin (v12 bake attempt 1). A local file
 # install can only install what's in the file. The extension is PLATFORM-SPECIFIC —
@@ -143,8 +143,8 @@ cat > /home/adom/.local/share/code-server/User/settings.json <<'SETTINGS'
   "workbench.trustedDomains.promptInTrustedWorkspace": false,
   "remote.portsAttributes": { "8821": { "onAutoForward": "silent" } },
   "remote.otherPortsAttributes": { "onAutoForward": "silent" },
-  "extensions.autoUpdate": true,
-  "extensions.autoCheckUpdates": true
+  "extensions.autoUpdate": false,
+  "extensions.autoCheckUpdates": false
 }
 SETTINGS
 chown adom:adom /home/adom/.local/share/code-server/User/settings.json
@@ -399,8 +399,8 @@ as_adom 'grep -q CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL ~/.bashrc || echo "export CLA
 # the floor version and leaves marketplace auto-update enabled — the runtime step in
 # adom-hydrogen (setup_steps_macos.rs) only removes the known-broken
 # 2.1.179-2.1.212 range. Keep the two in lockstep.
-log "final claude-code floor check (${CLAUDE_EXT_PIN}, auto-update ON)"
-as_adom 'node -e "const fs=require(\"fs\");const p=process.env.HOME+\"/.local/share/code-server/User/settings.json\";let s={};try{s=JSON.parse(fs.readFileSync(p,\"utf8\"))}catch(e){};s[\"extensions.autoUpdate\"]=true;s[\"extensions.autoCheckUpdates\"]=true;fs.writeFileSync(p,JSON.stringify(s,null,2))"'
+log "final claude-code floor check (${CLAUDE_EXT_PIN}, auto-update OFF)"
+as_adom 'node -e "const fs=require(\"fs\");const p=process.env.HOME+\"/.local/share/code-server/User/settings.json\";let s={};try{s=JSON.parse(fs.readFileSync(p,\"utf8\"))}catch(e){};s[\"extensions.autoUpdate\"]=false;s[\"extensions.autoCheckUpdates\"]=false;fs.writeFileSync(p,JSON.stringify(s,null,2))"'
 # (auto-update era, 2026-07-27: newer-than-pin builds are legitimate — no sweep.)
 as_adom "python3 - '${CLAUDE_EXT_PIN}' <<'PY'
 import json, os, sys
