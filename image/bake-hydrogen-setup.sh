@@ -23,52 +23,38 @@ as_adom() { runuser -u adom -- bash -lc "$1"; }
 WIKI_BASE="${WIKI_BASE:-https://wiki-ufypy5dpx93o.adom.cloud}"
 CS=/usr/lib/code-server/bin/code-server
 
-# ── step 15: install-claude-cli ────────────────────────────────────────────
-# Official installer → ~/.local/bin/claude (symlink to
-# ~/.local/share/claude/versions/<ver>). PATH line is idempotent. The
-# ~235 MB download cache is deleted — it would otherwise ship in the image
-# for nothing.
-#
-# The claude binary (bun-based) REQUIRES /proc and aborts without it. In
-# docker (CI) /proc exists and the installer self-completes + verifies.
-# In the chroot builder there is no /proc: the installer still downloads
-# AND checksum-verifies the binary, but its final `claude install` step
-# core-dumps — so we finish the versions/<ver> + symlink layout manually
-# (mirroring what `claude install` creates) and scripts/build-rootfs.sh
-# functionally verifies the binary afterwards under proot with /proc bound.
-log "step 15: claude CLI"
-if [ -e /proc/self ]; then
-    as_adom 'curl -fsSL --connect-timeout 15 https://claude.ai/install.sh -o /tmp/claude-install.sh && bash /tmp/claude-install.sh 2>&1 | tail -4; rm -f /tmp/claude-install.sh'
-    as_adom '~/.local/bin/claude --version'
-else
-    # Direct download, NOT install.sh: the current installer deletes its download
-    # after `claude install` — which core-dumps without /proc — so the old
-    # "salvage from ~/.claude/downloads" trick finds nothing (broke the v11 bake).
-    # Replicate its resolve→verify→place steps ourselves (same CDN + sha256 from
-    # the manifest). Arch-agnostic: an arm64 build host bakes NATIVE claude
-    # (v10, built on x86-64, shipped the x64 binary via Rosetta).
-    log "  no /proc (chroot build) — direct checksum-verified download"
-    cat > /tmp/claude-direct.sh <<'CLAUDE_EOF'
-set -euo pipefail
-B=https://downloads.claude.ai/claude-code-releases
-V=$(curl -fsSL --connect-timeout 15 "$B/latest")
-echo "$V" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+' || { echo "bad version: $V" >&2; exit 1; }
-case "$(uname -m)" in x86_64|amd64) P=linux-x64 ;; *) P=linux-arm64 ;; esac
-SUM=$(curl -fsSL "$B/$V/manifest.json" | jq -r ".platforms[\"$P\"].checksum")
-echo "$SUM" | grep -Eq '^[a-f0-9]{64}$' || { echo "no checksum for $P" >&2; exit 1; }
-mkdir -p "$HOME/.local/share/claude/versions" "$HOME/.local/bin"
-curl -fsSL "$B/$V/$P/claude" -o "$HOME/.local/share/claude/versions/$V"
-echo "$SUM  $HOME/.local/share/claude/versions/$V" | sha256sum -c - >/dev/null
-chmod 0755 "$HOME/.local/share/claude/versions/$V"
-ln -sfn "$HOME/.local/share/claude/versions/$V" "$HOME/.local/bin/claude"
-echo "claude $V ($P) placed"
-CLAUDE_EOF
-    as_adom 'bash /tmp/claude-direct.sh'
-    rm -f /tmp/claude-direct.sh
-    as_adom 'test -L ~/.local/bin/claude && test -s "$(readlink -f ~/.local/bin/claude)"'
+# ── step 15: claude CLI — a SHIM, not a standalone install (v21) ───────────
+# John's finding (2026-08-25, verified against the 2.1.218 floor vsix: it
+# carries extension/resources/native-binary/claude, ~270MB): the Claude Code
+# VS Code extension BUNDLES the full CLI. Baking a second standalone copy
+# (~290MB on arm64) doubled it for nothing — v21 ships a tiny wrapper at
+# ~/.local/bin/claude that re-resolves the newest installed extension's
+# bundled binary ON EVERY RUN, so the nightly extension auto-update chain
+# (claude ships 2–3 versions/day) can never break PATH: no symlink to a
+# version dir that gets swept, no baked version at all.
+# Fallback: a standalone ~/.local/share/claude/versions install (if a user or
+# older tooling ever creates one) is used only when no extension bundle exists.
+log "step 15: claude CLI shim (extension-bundled binary; no standalone install)"
+cat > /tmp/claude-shim.sh <<'CLAUDE_EOF'
+#!/usr/bin/env bash
+# claude → the CLI bundled inside the newest installed Claude Code extension.
+# Re-resolved every invocation (extension auto-updates swap version dirs).
+set -u
+# sort -V: plain globbing picks 2.1.9 over 2.1.245 lexically.
+best=$(ls -1d "$HOME"/.local/share/code-server/extensions/anthropic.claude-code-*/resources/native-binary/claude 2>/dev/null | sort -V | tail -1)
+if [ -z "$best" ] || [ ! -x "$best" ]; then
+  best=$(ls -1 "$HOME"/.local/share/claude/versions/* 2>/dev/null | sort -V | tail -1)
 fi
+if [ -z "$best" ] || [ ! -x "$best" ]; then
+  echo "claude: no Claude Code extension with a bundled CLI (and no standalone install) found" >&2
+  exit 127
+fi
+exec "$best" "$@"
+CLAUDE_EOF
+as_adom 'mkdir -p ~/.local/bin && cat /tmp/claude-shim.sh > ~/.local/bin/claude && chmod 0755 ~/.local/bin/claude && head -2 ~/.local/bin/claude | grep -q bash'
+rm -f /tmp/claude-shim.sh
 as_adom 'grep -q "/.local/bin" ~/.bashrc || printf "export PATH=\"\$HOME/.local/bin:\$PATH\"\n" >> ~/.bashrc'
-as_adom 'rm -rf ~/.claude/downloads'
+as_adom 'rm -rf ~/.claude/downloads ~/.local/share/claude'
 
 # ── step 16: install-claude-ext ────────────────────────────────────────────
 # PINNED, never latest: newer extension builds can be incompatible with

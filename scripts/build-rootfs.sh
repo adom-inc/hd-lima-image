@@ -242,8 +242,14 @@ in_root "set -e; code-server --version; node --version; git --version; \
   for b in adom-cli adom-vscode adom-mouser adom-digikey adom-jlcpcb adom-parts-search adom-gchat; do \
       test -x /usr/local/bin/\$b || { echo \"MISSING \$b\"; exit 1; }; done; \
   id adom | grep -q uid=1001; \
-  test -L /home/adom/.local/bin/claude && test -s \"\$(readlink -f /home/adom/.local/bin/claude)\" \
-      || { echo 'MISSING claude CLI'; exit 1; }; \
+  test -x /home/adom/.local/bin/claude \
+      || { echo 'MISSING claude CLI shim'; exit 1; }; \
+  head -3 /home/adom/.local/bin/claude | grep -q 'bundled inside' \
+      || { echo 'claude at ~/.local/bin is not the v21 extension shim'; exit 1; }; \
+  ls /home/adom/.local/share/code-server/extensions/anthropic.claude-code-*/resources/native-binary/claude >/dev/null 2>&1 \
+      || { echo 'MISSING extension-bundled claude binary (shim would 127)'; exit 1; }; \
+  test ! -e /home/adom/.local/share/claude \
+      || { echo 'LEAK: standalone claude install still in image (v21 shims to the extension bundle)'; exit 1; }; \
   runuser -u adom -- /usr/lib/code-server/bin/code-server --list-extensions 2>/dev/null | grep -qi '^anthropic.claude-code' \
       || { echo 'MISSING claude-code extension'; exit 1; }; \
   jq -e '.\"workbench.colorTheme\" == \"Default Dark Modern\"' /home/adom/.local/share/code-server/User/settings.json >/dev/null \
