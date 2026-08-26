@@ -29,7 +29,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # migrated; the smoke asserts this.
 ARG CODE_SERVER_VERSION=4.100.3
 ARG GOLDEN_VERSION=dev
-ARG WIKI_BASE=https://wiki-ufypy5dpx93o.adom.cloud
+ARG WIKI_BASE=https://wiki.adom.inc
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
@@ -123,9 +123,9 @@ RUN for f in /etc/pam.d/login /etc/pam.d/common-session /etc/pam.d/common-sessio
 # uses as its no-auth fallback. Baking them removes the wiki round-trips
 # from first run; the bootstrap updater reconciles to latest afterwards.
 RUN set -eux; \
-    curl -fsSL "${WIKI_BASE}/static/skills/adom-cli/adom-cli" -o /usr/local/bin/adom-cli; \
+    curl -fsSL "${WIKI_BASE}/api/v1/pages/adom-cli/files/adom-cli?org=adom" -o /usr/local/bin/adom-cli; \
     for b in adom-vscode adom-mouser adom-digikey adom-jlcpcb adom-parts-search adom-gchat; do \
-        curl -fsSL "${WIKI_BASE}/static/apps/${b}/${b}" -o "/usr/local/bin/${b}"; \
+        curl -fsSL "${WIKI_BASE}/api/v1/pages/${b}/files/${b}?org=adom" -o "/usr/local/bin/${b}"; \
     done; \
     chmod 0755 /usr/local/bin/adom-cli /usr/local/bin/adom-vscode \
         /usr/local/bin/adom-mouser /usr/local/bin/adom-digikey /usr/local/bin/adom-jlcpcb \

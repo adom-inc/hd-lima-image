@@ -20,7 +20,7 @@ set -euo pipefail
 log() { echo "[bake-hydrogen-setup] $*"; }
 as_adom() { runuser -u adom -- bash -lc "$1"; }
 
-WIKI_BASE="${WIKI_BASE:-https://wiki-ufypy5dpx93o.adom.cloud}"
+WIKI_BASE="${WIKI_BASE:-https://wiki.adom.inc}"
 CS=/usr/lib/code-server/bin/code-server
 
 # ── step 15: claude CLI — a SHIM, not a standalone install (v21) ───────────

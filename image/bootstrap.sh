@@ -26,7 +26,7 @@ fi
 STATEDIR=/var/lib/adom-bootstrap
 sudo mkdir -p "${STATEDIR}"
 
-INSTALL_MJS_URL="${ADOM_INSTALL_MJS_URL:-https://wiki-ufypy5dpx93o.adom.cloud/static/install.mjs}"
+INSTALL_MJS_URL="${ADOM_INSTALL_MJS_URL:-https://wiki.adom.inc/static/install.mjs}"
 TMP="$(mktemp)"
 trap 'rm -f "${TMP}"' EXIT
 

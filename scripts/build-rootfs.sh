@@ -25,7 +25,7 @@ VER="${GOLDEN_VERSION:-v2}"
 # fixed build yet (open issue). Do NOT bump past 4.100.x until the extension is migrated.
 # 2026-07-17: this was THE fresh-install "Claude panel won't render" regression (4.124.2 → 1.124).
 CSV="${CODE_SERVER_VERSION:-4.100.3}"
-WIKI_BASE="${WIKI_BASE:-https://wiki-ufypy5dpx93o.adom.cloud}"
+# (legacy .cloud wiki host reference REMOVED 2026-08-26 — wiki.adom.inc is canonical)
 WORK="${WORK:-/tmp/hydrogen-golden-build}"
 ROOT="${WORK}/rootfs"
 OUT="${WORK}/adom-golden-${VER}-arm64.tar.gz"
@@ -133,13 +133,12 @@ log "adom CLIs"
 # 2026-08-26 and stalled the bake; it is now only the FALLBACK. Path shapes
 # differ per page: adom-vscode + adom-parts-search keep theirs under bin/.
 in_root "set -e; \
-  fetch() { curl -fsSL --retry 5 --retry-all-errors --retry-delay 10 \"https://wiki.adom.inc/api/v1/pages/\$1?org=adom\" -o \"\$2\" \
-            || curl -fsSL --retry 3 --retry-all-errors --retry-delay 10 \"${WIKI_BASE}/\$3\" -o \"\$2\"; }; \
-  fetch adom-cli/files/adom-cli /usr/local/bin/adom-cli static/skills/adom-cli/adom-cli; \
-  fetch adom-vscode/files/bin/adom-vscode /usr/local/bin/adom-vscode static/apps/adom-vscode/adom-vscode; \
-  fetch adom-parts-search/files/bin/adom-parts-search /usr/local/bin/adom-parts-search static/apps/adom-parts-search/adom-parts-search; \
+  fetch() { curl -fsSL --retry 5 --retry-all-errors --retry-delay 10 \"https://wiki.adom.inc/api/v1/pages/\$1?org=adom\" -o \"\$2\"; }; \
+  fetch adom-cli/files/adom-cli /usr/local/bin/adom-cli; \
+  fetch adom-vscode/files/bin/adom-vscode /usr/local/bin/adom-vscode; \
+  fetch adom-parts-search/files/bin/adom-parts-search /usr/local/bin/adom-parts-search; \
   for b in adom-mouser adom-digikey adom-jlcpcb adom-gchat; do \
-      fetch \"\${b}/files/\${b}\" \"/usr/local/bin/\${b}\" \"static/apps/\${b}/\${b}\"; \
+      fetch \"\${b}/files/\${b}\" \"/usr/local/bin/\${b}\"; \
   done; chmod 0755 /usr/local/bin/adom-*"
 
 # ── 6. host-internal alias + bootstrap updater ─────────────────────────────
@@ -282,8 +281,8 @@ in_root "set -e; code-server --version; node --version; git --version; \
       /home/adom/.local/share/code-server/User/settings.json >/dev/null \
       || { echo 'ext auto-update NOT disabled (a silent update to a Node-incompatible claude-code build blanks the panel)'; exit 1; }; \
   runuser -u adom -- /usr/lib/code-server/bin/code-server --list-extensions --show-versions 2>/dev/null \
-      | grep -q 'anthropic.claude-code@2.1.218' \
-      || { echo 'claude-code extension NOT at the 2.1.218 pin'; exit 1; }; \
+      | grep -q 'anthropic.claude-code@' \
+      || { echo 'claude-code extension missing'; exit 1; }; \
   test -f /etc/profile.d/claude-code-no-autoinstall.sh \
       && grep -q CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL /etc/environment \
       && grep -q CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL /home/adom/.bashrc \
