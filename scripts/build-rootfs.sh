@@ -128,9 +128,9 @@ in_root "for f in /etc/pam.d/login /etc/pam.d/common-session /etc/pam.d/common-s
 
 # ── 5. Adom CLIs from the public wiki static path ──────────────────────────
 log "adom CLIs"
-in_root "set -e; curl -fsSL '${WIKI_BASE}/static/skills/adom-cli/adom-cli' -o /usr/local/bin/adom-cli; \
+in_root "set -e; curl -fsSL --retry 8 --retry-all-errors --retry-delay 15 '${WIKI_BASE}/static/skills/adom-cli/adom-cli' -o /usr/local/bin/adom-cli; \
   for b in adom-vscode adom-mouser adom-digikey adom-jlcpcb adom-parts-search adom-gchat; do \
-      curl -fsSL \"${WIKI_BASE}/static/apps/\${b}/\${b}\" -o \"/usr/local/bin/\${b}\"; \
+      curl -fsSL --retry 8 --retry-all-errors --retry-delay 15 \"${WIKI_BASE}/static/apps/\${b}/\${b}\" -o \"/usr/local/bin/\${b}\"; \
   done; chmod 0755 /usr/local/bin/adom-*"
 
 # ── 6. host-internal alias + bootstrap updater ─────────────────────────────
