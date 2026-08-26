@@ -56,6 +56,30 @@ rm -f /tmp/claude-shim.sh
 as_adom 'grep -q "/.local/bin" ~/.bashrc || printf "export PATH=\"\$HOME/.local/bin:\$PATH\"\n" >> ~/.bashrc'
 as_adom 'rm -rf ~/.claude/downloads ~/.local/share/claude'
 
+# ── step 15b: codex CLI shim (v22 — same doctrine as claude) ────────────────
+# The Codex extension bundles the FULL codex CLI (extension/bin/linux-<arch>/
+# codex, ~229MB, plus its own rg/bwrap/zsh runtime) — verified against the
+# 26.5820.60940 linux-arm64 vsix. One shim, zero standalone installs, PATH via
+# the same ~/.local/bin. The arch dir is linux-aarch64 OR linux-arm64 OR
+# linux-x64 depending on the vsix vintage — glob them all.
+log "step 15b: codex CLI shim (extension-bundled binary)"
+cat > /tmp/codex-shim.sh <<'CODEX_EOF'
+#!/usr/bin/env bash
+# codex → the CLI bundled inside the newest installed Codex (openai.chatgpt)
+# extension. Re-resolved every invocation (extension updates swap version dirs).
+set -u
+best=$(ls -1d "$HOME"/.local/share/code-server/extensions/openai.chatgpt-*/bin/linux-*/codex 2>/dev/null | sort -V | tail -1)
+if [ -z "$best" ] || [ ! -x "$best" ]; then
+  echo "codex: no Codex extension with a bundled CLI found (install the openai.chatgpt extension)" >&2
+  exit 127
+fi
+exec "$best" "$@"
+CODEX_EOF
+as_adom 'cat /tmp/codex-shim.sh > ~/.local/bin/codex && chmod 0755 ~/.local/bin/codex'
+rm -f /tmp/codex-shim.sh
+# No standalone codex anywhere: the shim is the only entry point.
+as_adom 'rm -rf ~/.local/share/codex ~/.codex/bin 2>/dev/null || true'
+
 # ── step 16: install-claude-ext ────────────────────────────────────────────
 # PINNED, never latest: newer extension builds can be incompatible with
 # code-server's Node (2.1.179–2.1.212 crash → blank Claude panel; baking latest
@@ -64,20 +88,49 @@ as_adom 'rm -rf ~/.claude/downloads ~/.local/share/claude'
 # renders, full send/receive). LOCKSTEP: this pin must match CLAUDE_CODE_PIN in
 # adom-hydrogen setup_steps_macos.rs (the runtime enforcement) — bump both
 # together after verifying a new version renders.
-CLAUDE_EXT_PIN="2.1.218"
-log "step 16: Claude Code extension (Open VSX, floor ${CLAUDE_EXT_PIN}, auto-update OFF (2026-08-05 slim doctrine: silent ext updates blank the panel))"
+EXT_ARCH="$(dpkg --print-architecture 2>/dev/null || echo arm64)"; [ "$EXT_ARCH" = "amd64" ] && EXT_ARCH=x64
+# v22 (Kyle 2026-08-26): bake the CURRENT extension, not the historical floor.
+# The 2.1.218 floor exists in the RUNTIME converge (setup_steps_macos.rs), which
+# still removes the known-broken 2.1.179-2.1.212 range and can roll forward —
+# the bake just starts fresh installs at latest so the first boot needs no
+# marketplace round-trip. Resolve latest for the arch from Open VSX.
+CLAUDE_EXT_PIN="$(curl -fsSL "https://open-vsx.org/api/Anthropic/claude-code/linux-${EXT_ARCH:-arm64}" | jq -r '.version')"
+echo "$CLAUDE_EXT_PIN" | grep -Eq '^[0-9]+\.' || { echo "bake: could not resolve latest claude-code version" >&2; exit 1; }
+log "step 16: Claude Code extension (Open VSX, CURRENT ${CLAUDE_EXT_PIN}, auto-update OFF (silent ext updates blank the panel))"
 # Install from the exact .vsix, NOT `ext@version`: code-server's CLI has been seen
 # resolving/updating to LATEST despite the @pin (v12 bake attempt 1). A local file
 # install can only install what's in the file. The extension is PLATFORM-SPECIFIC —
 # resolve the linux-<arch> target's download URL via the Open VSX API (the bare
 # /file/ URL guess 404s; the namespace is capitalized "Anthropic").
-EXT_ARCH="$(dpkg --print-architecture 2>/dev/null || echo arm64)"; [ "$EXT_ARCH" = "amd64" ] && EXT_ARCH=x64
 as_adom "curl -fsSL 'https://open-vsx.org/api/Anthropic/claude-code/linux-${EXT_ARCH}/${CLAUDE_EXT_PIN}' | jq -r '.files.download' | xargs curl -fsSL -o /tmp/claude-code-pin.vsix"
 # EXTENSIONS_GALLERY → dead endpoint: without it code-server's CLI consults the
 # marketplace during ANY install (even a local vsix, even with autoUpdate=false in
 # settings) and silently updates to latest — reintroducing the incompatible build.
 as_adom "EXTENSIONS_GALLERY='{\"serviceUrl\":\"https://127.0.0.1:1\"}' $CS --install-extension /tmp/claude-code-pin.vsix --force 2>&1 | tail -2"
 as_adom "$CS --list-extensions --show-versions 2>/dev/null | grep -qi \"claude-code@${CLAUDE_EXT_PIN}\""
+
+# ── step 16b: Codex (openai.chatgpt) extension — CURRENT, baked (v22) ───────
+# Kyle 2026-08-26: Codex is a first-class agent in the product but nothing
+# installed it on mac (the workspace-updater daemon that used to add it is
+# DISARMED on macOS, and its wiki manifest page is gone) — fresh containers
+# had no Codex at all. Marketplace-only (NOT on Open VSX); the vspackage
+# endpoint serves the vsix GZIP-WRAPPED. The extension BUNDLES the full codex
+# CLI (extension/bin/linux-<arch>/codex) — the shim step below puts it on
+# PATH, so baking the extension is the ONLY codex install (no standalone, no
+# duplicate).
+log "step 16b: Codex extension (marketplace, current)"
+CODEX_ARCH="linux-arm64"; [ "${EXT_ARCH}" = "x64" ] && CODEX_ARCH="linux-x64"
+CODEX_VER="$(curl -fsSL -m 30 -X POST 'https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery' \
+    -H 'Content-Type: application/json' -H 'Accept: application/json;api-version=3.0-preview.1' \
+    -d '{"filters":[{"criteria":[{"filterType":7,"value":"openai.chatgpt"}]}],"flags":950}' \
+    | jq -r '.results[0].extensions[0].versions[0].version')"
+echo "$CODEX_VER" | grep -Eq '^[0-9]+\.' || { echo "bake: could not resolve codex extension version" >&2; exit 1; }
+curl -fsSL -m 600 "https://marketplace.visualstudio.com/_apis/public/gallery/publishers/openai/vsextensions/chatgpt/${CODEX_VER}/vspackage?targetPlatform=${CODEX_ARCH}" -o /tmp/codex.vsix.gz
+gunzip -f /tmp/codex.vsix.gz
+as_adom "EXTENSIONS_GALLERY='{\"serviceUrl\":\"https://127.0.0.1:1\"}' $CS --install-extension /tmp/codex.vsix --force 2>&1 | tail -2"
+rm -f /tmp/codex.vsix
+as_adom "$CS --list-extensions --show-versions 2>/dev/null | grep -qi 'openai.chatgpt@'"
+log "  codex extension ${CODEX_VER} baked"
 
 # ── step 3: install-adom-vscode (extension half; binary baked earlier) ────
 # `adom-vscode install` drops the .vsix at /tmp + skill + completions but

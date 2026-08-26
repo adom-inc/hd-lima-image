@@ -252,6 +252,12 @@ in_root "set -e; code-server --version; node --version; git --version; \
       || { echo 'LEAK: standalone claude install still in image (v21 shims to the extension bundle)'; exit 1; }; \
   runuser -u adom -- /usr/lib/code-server/bin/code-server --list-extensions 2>/dev/null | grep -qi '^anthropic.claude-code' \
       || { echo 'MISSING claude-code extension'; exit 1; }; \
+  runuser -u adom -- /usr/lib/code-server/bin/code-server --list-extensions 2>/dev/null | grep -qi '^openai.chatgpt' \
+      || { echo 'MISSING codex (openai.chatgpt) extension (v22 bakes it)'; exit 1; }; \
+  test -x /home/adom/.local/bin/codex \
+      || { echo 'MISSING codex CLI shim'; exit 1; }; \
+  ls /home/adom/.local/share/code-server/extensions/openai.chatgpt-*/bin/linux-*/codex >/dev/null 2>&1 \
+      || { echo 'MISSING extension-bundled codex binary (shim would 127)'; exit 1; }; \
   jq -e '.\"workbench.colorTheme\" == \"Default Dark Modern\"' /home/adom/.local/share/code-server/User/settings.json >/dev/null \
       || { echo 'MISSING dark-mode settings.json'; exit 1; }; \
   jq -e 'has(\"claudeCode.selectedModel\") | not' /home/adom/.local/share/code-server/User/settings.json >/dev/null \
