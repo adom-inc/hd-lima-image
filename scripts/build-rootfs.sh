@@ -128,9 +128,18 @@ in_root "for f in /etc/pam.d/login /etc/pam.d/common-session /etc/pam.d/common-s
 
 # ── 5. Adom CLIs from the public wiki static path ──────────────────────────
 log "adom CLIs"
-in_root "set -e; curl -fsSL --retry 8 --retry-all-errors --retry-delay 15 '${WIKI_BASE}/static/skills/adom-cli/adom-cli' -o /usr/local/bin/adom-cli; \
-  for b in adom-vscode adom-mouser adom-digikey adom-jlcpcb adom-parts-search adom-gchat; do \
-      curl -fsSL --retry 8 --retry-all-errors --retry-delay 15 \"${WIKI_BASE}/static/apps/\${b}/\${b}\" -o \"/usr/local/bin/\${b}\"; \
+# v22: fetch the CLIs from the MAIN wiki's page-file API (canonical, same
+# x86-64 binaries) — the legacy .cloud static host 502'd for an hour on
+# 2026-08-26 and stalled the bake; it is now only the FALLBACK. Path shapes
+# differ per page: adom-vscode + adom-parts-search keep theirs under bin/.
+in_root "set -e; \
+  fetch() { curl -fsSL --retry 5 --retry-all-errors --retry-delay 10 \"https://wiki.adom.inc/api/v1/pages/\$1?org=adom\" -o \"\$2\" \
+            || curl -fsSL --retry 3 --retry-all-errors --retry-delay 10 \"${WIKI_BASE}/\$3\" -o \"\$2\"; }; \
+  fetch adom-cli/files/adom-cli /usr/local/bin/adom-cli static/skills/adom-cli/adom-cli; \
+  fetch adom-vscode/files/bin/adom-vscode /usr/local/bin/adom-vscode static/apps/adom-vscode/adom-vscode; \
+  fetch adom-parts-search/files/bin/adom-parts-search /usr/local/bin/adom-parts-search static/apps/adom-parts-search/adom-parts-search; \
+  for b in adom-mouser adom-digikey adom-jlcpcb adom-gchat; do \
+      fetch \"\${b}/files/\${b}\" \"/usr/local/bin/\${b}\" \"static/apps/\${b}/\${b}\"; \
   done; chmod 0755 /usr/local/bin/adom-*"
 
 # ── 6. host-internal alias + bootstrap updater ─────────────────────────────
