@@ -80,6 +80,78 @@ rm -f /tmp/codex-shim.sh
 # No standalone codex anywhere: the shim is the only entry point.
 as_adom 'rm -rf ~/.local/share/codex ~/.codex/bin 2>/dev/null || true'
 
+# ── step 15c: Antigravity CLI (agy) + Kimi Code CLI (kimi) — v23 ────────────
+# Kyle 2026-09-01: the "set up agent harnesses" first-run stage lets a user pick
+# any of Claude / Codex / Antigravity / Kimi and sign each in from a clean UI
+# backed by the real CLI in the workspace — so all four must be on PATH in a
+# fresh image (claude + codex are the extension-bundled shims above; these two
+# have no VS Code extension carrying a CLI, so they are real installs).
+#
+# Both are STATIC single binaries from the vendors' own install scripts, fetched
+# for the bake arch (arm64 rootfs runs native — no Rosetta). Neither needs
+# node/npm at runtime. Installed with PATH-mutation OFF: ~/.local/bin is already
+# on PATH (step 15) and we put both entry points there ourselves so the runtime
+# `command -v` detection in hydrogen-control/agent_harness.rs is one rule.
+#   agy  → ~/.local/bin/agy          (installer default; --skip-path --skip-aliases)
+#   kimi → ~/.kimi-code/bin/kimi     (installer default; KIMI_NO_MODIFY_PATH=1)
+#           + symlink ~/.local/bin/kimi
+# Network failure here FAILS the bake (no `|| true`): a golden image that silently
+# lacks an agent would make the harness stage lie about "installed".
+log "step 15c: Antigravity CLI (agy) + Kimi Code CLI (kimi)"
+as_adom 'curl -fsSL --retry 5 --retry-all-errors https://antigravity.google/cli/install.sh | bash -s -- --skip-path --skip-aliases'
+as_adom 'test -x ~/.local/bin/agy && ~/.local/bin/agy --version'
+as_adom 'curl -fsSL --retry 5 --retry-all-errors https://code.kimi.com/kimi-code/install.sh | KIMI_NO_MODIFY_PATH=1 bash'
+as_adom 'test -x ~/.kimi-code/bin/kimi && ln -sfn ~/.kimi-code/bin/kimi ~/.local/bin/kimi && ~/.local/bin/kimi --version'
+
+# Antigravity keeps its OAuth session ONLY in a Secret Service keyring (Linux:
+# org.freedesktop.secrets over the D-Bus SESSION bus). It has no plaintext
+# fallback, and its container "file-based token" mode is write-only
+# (google-antigravity/antigravity-cli#479, #57) — so a headless machine with no
+# session bus + keyring daemon forgets the login the moment `agy` exits. The
+# one workaround that is reported to work is a real session bus + an UNLOCKED
+# gnome-keyring. We have both cheaply: adom already lingers (user@1001.service
+# boots with the machine → dbus-user-session gives /run/user/1001/bus), and a
+# user unit runs gnome-keyring's secrets component in the foreground, unlocking
+# (creating, on first boot) the "login" keyring with an EMPTY password — the
+# same posture as every CI recipe for libsecret; the keyring file lives under
+# ~/.local/share/keyrings inside the user's own machine, not on the host.
+# DBUS_SESSION_BUS_ADDRESS is planted in profile.d so code-server terminals and
+# Hydrogen's `bash -lc` exec path (which is how the harness stage drives agy)
+# both reach the bus. Packages: dbus-user-session gnome-keyring libsecret-tools
+# (apt baseline in image/Dockerfile + scripts/build-rootfs.sh, lockstep).
+log "step 15c: session bus + unlocked gnome-keyring for agy credential persistence"
+install -d -o adom -g adom -m 0755 /home/adom/.config/systemd/user /home/adom/.config/systemd/user/default.target.wants
+cat > /home/adom/.config/systemd/user/adom-agent-keyring.service <<'UNIT'
+[Unit]
+Description=Adom: unlocked gnome-keyring secret service for agent CLIs (Antigravity)
+Documentation=https://github.com/google-antigravity/antigravity-cli/issues/57
+Requires=dbus.socket
+After=dbus.socket
+
+[Service]
+Type=simple
+# --unlock reads the keyring password from stdin; an empty password creates the
+# "login" keyring on first boot and unlocks it on every boot thereafter.
+ExecStart=/bin/sh -c 'printf "" | exec /usr/bin/gnome-keyring-daemon --foreground --unlock --components=secrets'
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target
+UNIT
+chown adom:adom /home/adom/.config/systemd/user/adom-agent-keyring.service
+ln -sfn ../adom-agent-keyring.service /home/adom/.config/systemd/user/default.target.wants/adom-agent-keyring.service
+chown -h adom:adom /home/adom/.config/systemd/user/default.target.wants/adom-agent-keyring.service
+cat > /etc/profile.d/adom-agent-keyring.sh <<'PROF'
+# Adom: reach the lingering user session bus (dbus-user-session) so Secret
+# Service clients (Antigravity CLI) find the unlocked gnome-keyring.
+if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then
+  export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u)/bus"
+fi
+PROF
+chmod 0644 /etc/profile.d/adom-agent-keyring.sh
+test -x /usr/bin/gnome-keyring-daemon
+
 # ── step 16: install-claude-ext ────────────────────────────────────────────
 # PINNED, never latest: newer extension builds can be incompatible with
 # code-server's Node (2.1.179–2.1.212 crash → blank Claude panel; baking latest

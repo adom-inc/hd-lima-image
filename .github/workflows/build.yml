@@ -82,6 +82,13 @@ jobs:
             command -v cron >/dev/null && command -v crontab >/dev/null || { echo "MISSING cron/crontab"; exit 1; }
             test -L /etc/systemd/system/multi-user.target.wants/cron.service || { echo "cron.service not enabled"; exit 1; }
             echo "v10: linger + pam_lastlog-removed + cron enabled"
+            # v23: agent harnesses — agy + kimi on adom's PATH, keyring unit enabled, session-bus profile.d
+            test -x /home/adom/.local/bin/agy || { echo "MISSING agy (Antigravity CLI)"; exit 1; }
+            test -x /home/adom/.local/bin/kimi && test -x /home/adom/.kimi-code/bin/kimi || { echo "MISSING kimi (Kimi Code CLI)"; exit 1; }
+            test -x /usr/bin/gnome-keyring-daemon && test -x /usr/bin/secret-tool || { echo "MISSING gnome-keyring/libsecret-tools"; exit 1; }
+            test -L /home/adom/.config/systemd/user/default.target.wants/adom-agent-keyring.service || { echo "adom-agent-keyring.service not enabled"; exit 1; }
+            test -f /etc/profile.d/adom-agent-keyring.sh || { echo "MISSING adom-agent-keyring profile.d"; exit 1; }
+            echo "v23: agy + kimi + keyring unit"
             echo SMOKE-OK
           '
 
