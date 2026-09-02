@@ -131,7 +131,9 @@ as_adom 'test -x ~/.kimi-code/bin/kimi && ln -sfn ~/.kimi-code/bin/kimi ~/.local
 # both reach the bus. Packages: dbus-user-session gnome-keyring libsecret-tools
 # (apt baseline in image/Dockerfile + scripts/build-rootfs.sh, lockstep).
 log "step 15c: session bus + unlocked gnome-keyring for agy credential persistence"
-install -d -o adom -g adom -m 0755 /home/adom/.config/systemd/user /home/adom/.config/systemd/user/default.target.wants
+# Every level explicitly (install -d creates PARENTS as root — v23 bake #2 left
+# /home/adom/.config root-owned and step 16's code-server EACCES'd on it).
+install -d -o adom -g adom -m 0755 /home/adom/.config /home/adom/.config/systemd /home/adom/.config/systemd/user /home/adom/.config/systemd/user/default.target.wants
 cat > /home/adom/.config/systemd/user/adom-agent-keyring.service <<'UNIT'
 [Unit]
 Description=Adom: unlocked gnome-keyring secret service for agent CLIs (Antigravity)
