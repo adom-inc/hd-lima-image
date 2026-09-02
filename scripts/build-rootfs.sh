@@ -327,6 +327,12 @@ in_root "set -e; code-server --version; node --version; git --version; \
       || { echo 'LEAK: legacy stale-detector update hook still registered'; exit 1; }; \
   test -x /home/adom/.local/bin/agy || { echo 'MISSING agy (Antigravity CLI)'; exit 1; }; \
   test -x /home/adom/.local/bin/kimi && test -x /home/adom/.kimi-code/bin/kimi || { echo 'MISSING kimi (Kimi Code CLI)'; exit 1; }; \
+  runuser -u adom -- /usr/lib/code-server/bin/code-server --list-extensions 2>/dev/null \
+      | grep -qi 'moonshot-ai.kimi-code' || { echo 'MISSING kimi-code extension (v24)'; exit 1; }; \
+  runuser -u adom -- /usr/lib/code-server/bin/code-server --list-extensions 2>/dev/null \
+      | grep -qi 'google.google-antigravity' || { echo 'MISSING antigravity extension (v24)'; exit 1; }; \
+  test -L /home/adom/.gemini/bin/agy && test -x /home/adom/.gemini/bin/agy \
+      || { echo 'MISSING ~/.gemini/bin/agy symlink (antigravity ext would re-download its backend)'; exit 1; }; \
   test -x /usr/bin/gnome-keyring-daemon && test -x /usr/bin/secret-tool || { echo 'MISSING gnome-keyring/libsecret-tools'; exit 1; }; \
   test -L /home/adom/.config/systemd/user/default.target.wants/adom-agent-keyring.service || { echo 'adom-agent-keyring.service not enabled'; exit 1; }; \
   test -f /etc/profile.d/adom-agent-keyring.sh || { echo 'MISSING adom-agent-keyring profile.d'; exit 1; }; \

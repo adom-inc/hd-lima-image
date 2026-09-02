@@ -217,6 +217,44 @@ rm -f /tmp/codex.vsix
 as_adom "$CS --list-extensions --show-versions 2>/dev/null | grep -qi 'openai.chatgpt@'"
 log "  codex extension ${CODEX_VER} baked"
 
+# ── step 16c: Kimi Code + Google Antigravity extensions — CURRENT, baked (v24)
+# Kyle 2026-09-01: "i also don't see the kimi code/antigravity code-server
+# extensions, weren't they supposed to be baked into the golden image?" — v23
+# baked only the two CLIs (step 15c); the harness stage signs a user into an
+# agent whose editor UI then wasn't there. Same install pattern as 16/16b
+# (exact vsix, dead EXTENSIONS_GALLERY, --list-extensions verify).
+#   kimi → moonshot-ai.kimi-code, Open VSX, PLATFORM-SPECIFIC (linux-<arch>),
+#          engines ^1.100.0 (code-server 4.100.x = VS Code 1.100 — satisfied;
+#          bump CSV in build-rootfs.sh before the ext floor moves). The
+#          extension BUNDLES agent-core and does NOT spawn the `kimi` CLI —
+#          it shares ~/.kimi-code (credentials/, config.toml) with it, so the
+#          harness stage's `kimi login` signs both in at once.
+#   agy  → Google.google-antigravity, marketplace-only (NOT on Open VSX),
+#          universal vsix, vspackage GZIP-WRAPPED like codex. At activation it
+#          resolves its backend at ~/.gemini/bin/agy and, if missing/old, pulls
+#          it from the same antigravity-cli-auto-updater manifests the 15c
+#          installer used — so we symlink the baked ~/.local/bin/agy there:
+#          one binary, no first-run download, one keyring session.
+log "step 16c: Kimi Code + Antigravity extensions (current)"
+KIMI_EXT_PIN="$(curl -fsSL "https://open-vsx.org/api/moonshot-ai/kimi-code/linux-${EXT_ARCH}" | jq -r '.version')"
+echo "$KIMI_EXT_PIN" | grep -Eq '^[0-9]+\.' || { echo "bake: could not resolve latest kimi-code extension version" >&2; exit 1; }
+as_adom "curl -fsSL 'https://open-vsx.org/api/moonshot-ai/kimi-code/linux-${EXT_ARCH}/${KIMI_EXT_PIN}' | jq -r '.files.download' | xargs curl -fsSL -o /tmp/kimi-code.vsix"
+as_adom "EXTENSIONS_GALLERY='{\"serviceUrl\":\"https://127.0.0.1:1\"}' $CS --install-extension /tmp/kimi-code.vsix --force 2>&1 | tail -2"
+as_adom "rm -f /tmp/kimi-code.vsix; $CS --list-extensions --show-versions 2>/dev/null | grep -qi \"moonshot-ai.kimi-code@${KIMI_EXT_PIN}\""
+log "  kimi-code extension ${KIMI_EXT_PIN} baked"
+AGY_EXT_VER="$(curl -fsSL -m 30 -X POST 'https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery' \
+    -H 'Content-Type: application/json' -H 'Accept: application/json;api-version=3.0-preview.1' \
+    -d '{"filters":[{"criteria":[{"filterType":7,"value":"Google.google-antigravity"}]}],"flags":950}' \
+    | jq -r '.results[0].extensions[0].versions[0].version')"
+echo "$AGY_EXT_VER" | grep -Eq '^[0-9]+\.' || { echo "bake: could not resolve antigravity extension version" >&2; exit 1; }
+curl -fsSL -m 600 "https://marketplace.visualstudio.com/_apis/public/gallery/publishers/Google/vsextensions/google-antigravity/${AGY_EXT_VER}/vspackage" -o /tmp/agy-ext.vsix.gz
+gunzip -f /tmp/agy-ext.vsix.gz
+as_adom "EXTENSIONS_GALLERY='{\"serviceUrl\":\"https://127.0.0.1:1\"}' $CS --install-extension /tmp/agy-ext.vsix --force 2>&1 | tail -2"
+rm -f /tmp/agy-ext.vsix
+as_adom "$CS --list-extensions --show-versions 2>/dev/null | grep -qi 'google.google-antigravity@'"
+as_adom 'install -d -m 0755 ~/.gemini ~/.gemini/bin && ln -sfn ~/.local/bin/agy ~/.gemini/bin/agy && ~/.gemini/bin/agy --version'
+log "  antigravity extension ${AGY_EXT_VER} baked (+ ~/.gemini/bin/agy → ~/.local/bin/agy)"
+
 # ── step 3: install-adom-vscode (extension half; binary baked earlier) ────
 # `adom-vscode install` drops the .vsix at /tmp + skill + completions but
 # does NOT register with code-server (proven 2026-05-31) — register the
