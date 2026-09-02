@@ -255,6 +255,24 @@ as_adom "$CS --list-extensions --show-versions 2>/dev/null | grep -qi 'google.go
 as_adom 'install -d -m 0755 ~/.gemini ~/.gemini/bin && ln -sfn ~/.local/bin/agy ~/.gemini/bin/agy && ~/.gemini/bin/agy --version'
 log "  antigravity extension ${AGY_EXT_VER} baked (+ ~/.gemini/bin/agy → ~/.local/bin/agy)"
 
+# ── step 16d: Adom Agent Bar extension — OURS, baked (v25) ──────────────────
+# Kyle 2026-09-02: title-bar buttons that open a NEW Claude Code / Codex /
+# Kimi tab (Antigravity: sidebar, it has no tab command). Source lives in
+# hydrogen-macos/vscode-agent-bar/ (docs/features/ui/agent-bar.md); the vsix
+# is checked in here at image/adom-agent-bar/ and staged at /tmp/adom-agent-bar
+# (Dockerfile COPY / build-rootfs.sh) — no network, nothing to resolve. The
+# buttons render in the title bar only because settings.json below sets
+# workbench.editor.editorActionsLocation=titleBar (the extension would set it
+# itself on first activation, but baking it avoids a settings write at boot).
+log "step 16d: Adom Agent Bar extension (local vsix)"
+AGENT_BAR_VSIX="$(ls /tmp/adom-agent-bar/adom-agent-bar-*.vsix 2>/dev/null | sort -V | tail -1)"
+[ -f "$AGENT_BAR_VSIX" ] || { echo "bake: /tmp/adom-agent-bar/adom-agent-bar-*.vsix not staged" >&2; exit 1; }
+cp "$AGENT_BAR_VSIX" /tmp/agent-bar.vsix && chmod 0644 /tmp/agent-bar.vsix
+as_adom "EXTENSIONS_GALLERY='{\"serviceUrl\":\"https://127.0.0.1:1\"}' $CS --install-extension /tmp/agent-bar.vsix --force 2>&1 | tail -2"
+rm -f /tmp/agent-bar.vsix; rm -rf /tmp/adom-agent-bar
+as_adom "$CS --list-extensions --show-versions 2>/dev/null | grep -qi 'adom.adom-agent-bar@'"
+log "  adom-agent-bar extension baked ($(basename "$AGENT_BAR_VSIX"))"
+
 # ── step 3: install-adom-vscode (extension half; binary baked earlier) ────
 # `adom-vscode install` drops the .vsix at /tmp + skill + completions but
 # does NOT register with code-server (proven 2026-05-31) — register the
@@ -289,6 +307,7 @@ cat > /home/adom/.local/share/code-server/User/settings.json <<'SETTINGS'
   "workbench.navigationControl.enabled": false,
   "workbench.secondarySideBar.visible": false,
   "workbench.secondarySideBar.defaultVisibility": "hidden",
+  "workbench.editor.editorActionsLocation": "titleBar",
   "claudeCode.allowDangerouslySkipPermissions": true,
   "claudeCode.initialPermissionMode": "bypassPermissions",
   "claudeCode.preferredLocation": "panel",

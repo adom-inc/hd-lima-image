@@ -172,6 +172,12 @@ else
   echo "build-rootfs: BRIDGE_CLI_SRC not found (${BRIDGE_CLI_SRC}) — bake will fail at step 10 unless the wiki manifest carries a linux CLI" >&2
 fi
 
+# Adom Agent Bar extension (ours; vsix checked into image/adom-agent-bar/,
+# built from hydrogen-macos/vscode-agent-bar/build.sh) — staged for bake step 16d.
+sudo rm -rf "${ROOT}/tmp/adom-agent-bar"
+sudo mkdir -p "${ROOT}/tmp/adom-agent-bar"
+sudo install -m 0644 "$(dirname "$0")"/../image/adom-agent-bar/adom-agent-bar-*.vsix "${ROOT}/tmp/adom-agent-bar/"
+
 # adom-wiki CLI (native arm64; the official wiki package manager — adompkg is
 # RETIRED) — staged for the adom-wiki step in bake-hydrogen-setup.sh. Source: the same
 # binary adom-hydrogen bundles (scripts/fetch-adom-wiki.sh stages it there).
@@ -331,6 +337,10 @@ in_root "set -e; code-server --version; node --version; git --version; \
       | grep -qi 'moonshot-ai.kimi-code' || { echo 'MISSING kimi-code extension (v24)'; exit 1; }; \
   runuser -u adom -- /usr/lib/code-server/bin/code-server --list-extensions 2>/dev/null \
       | grep -qi 'google.google-antigravity' || { echo 'MISSING antigravity extension (v24)'; exit 1; }; \
+  runuser -u adom -- /usr/lib/code-server/bin/code-server --list-extensions 2>/dev/null \
+      | grep -qi 'adom.adom-agent-bar' || { echo 'MISSING adom-agent-bar extension (v25)'; exit 1; }; \
+  jq -e '.["workbench.editor.editorActionsLocation"] == "titleBar"' /home/adom/.local/share/code-server/User/settings.json >/dev/null \
+      || { echo 'settings.json lacks editorActionsLocation=titleBar (agent bar would sit in the tab strip)'; exit 1; }; \
   test -L /home/adom/.gemini/bin/agy && test -x /home/adom/.gemini/bin/agy \
       || { echo 'MISSING ~/.gemini/bin/agy symlink (antigravity ext would re-download its backend)'; exit 1; }; \
   test -x /usr/bin/gnome-keyring-daemon && test -x /usr/bin/secret-tool || { echo 'MISSING gnome-keyring/libsecret-tools'; exit 1; }; \
