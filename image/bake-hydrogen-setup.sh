@@ -89,16 +89,27 @@ as_adom 'rm -rf ~/.local/share/codex ~/.codex/bin 2>/dev/null || true'
 #
 # Both are STATIC single binaries from the vendors' own install scripts, fetched
 # for the bake arch (arm64 rootfs runs native — no Rosetta). Neither needs
-# node/npm at runtime. Installed with PATH-mutation OFF: ~/.local/bin is already
-# on PATH (step 15) and we put both entry points there ourselves so the runtime
-# `command -v` detection in hydrogen-control/agent_harness.rs is one rule.
-#   agy  → ~/.local/bin/agy          (installer default; --skip-path --skip-aliases)
+# node/npm at runtime. ~/.local/bin is already on PATH (step 15) and we put both
+# entry points there ourselves so the runtime `command -v` detection in
+# hydrogen-control/agent_harness.rs is one rule.
+#   agy  → ~/.local/bin/agy          (installer default). The installer takes ONLY
+#           `-d/--dir` (verified 2026-09-01 — v23 bake #1 died on invented
+#           --skip-* flags) and ends with `agy install || true`, whose shell-rc
+#           edits we don't want in the image: snapshot the rc files around it and
+#           put them back.
 #   kimi → ~/.kimi-code/bin/kimi     (installer default; KIMI_NO_MODIFY_PATH=1)
 #           + symlink ~/.local/bin/kimi
 # Network failure here FAILS the bake (no `|| true`): a golden image that silently
 # lacks an agent would make the harness stage lie about "installed".
 log "step 15c: Antigravity CLI (agy) + Kimi Code CLI (kimi)"
-as_adom 'curl -fsSL --retry 5 --retry-all-errors https://antigravity.google/cli/install.sh | bash -s -- --skip-path --skip-aliases'
+as_adom 'set -e; cd ~; snap=$(mktemp -d); for f in .bashrc .profile .bash_profile .zshrc .zprofile; do [ -e "$f" ] && cp -p "$f" "$snap/$f"; done
+  [ -d .config/fish ] && cp -a .config/fish "$snap/fish" || true
+  curl -fsSL --retry 5 --retry-all-errors https://antigravity.google/cli/install.sh | bash
+  for f in .bashrc .profile .bash_profile .zshrc .zprofile; do
+    if [ -e "$snap/$f" ]; then cp -p "$snap/$f" "$f"; elif [ -e "$f" ]; then echo "  (agy installer created ~/$f — removing)"; rm -f "$f"; fi
+  done
+  if [ -d "$snap/fish" ]; then rm -rf .config/fish && cp -a "$snap/fish" .config/fish; elif [ -d .config/fish ]; then echo "  (agy installer created ~/.config/fish — removing)"; rm -rf .config/fish; fi
+  rm -rf "$snap" ~/.cache/antigravity/staging'
 as_adom 'test -x ~/.local/bin/agy && ~/.local/bin/agy --version'
 as_adom 'curl -fsSL --retry 5 --retry-all-errors https://code.kimi.com/kimi-code/install.sh | KIMI_NO_MODIFY_PATH=1 bash'
 as_adom 'test -x ~/.kimi-code/bin/kimi && ln -sfn ~/.kimi-code/bin/kimi ~/.local/bin/kimi && ~/.local/bin/kimi --version'
