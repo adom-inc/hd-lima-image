@@ -269,9 +269,25 @@ AGENT_BAR_VSIX="$(ls /tmp/adom-agent-bar/adom-agent-bar-*.vsix 2>/dev/null | sor
 [ -f "$AGENT_BAR_VSIX" ] || { echo "bake: /tmp/adom-agent-bar/adom-agent-bar-*.vsix not staged" >&2; exit 1; }
 cp "$AGENT_BAR_VSIX" /tmp/agent-bar.vsix && chmod 0644 /tmp/agent-bar.vsix
 as_adom "EXTENSIONS_GALLERY='{\"serviceUrl\":\"https://127.0.0.1:1\"}' $CS --install-extension /tmp/agent-bar.vsix --force 2>&1 | tail -2"
-rm -f /tmp/agent-bar.vsix; rm -rf /tmp/adom-agent-bar
+rm -f /tmp/agent-bar.vsix
 as_adom "$CS --list-extensions --show-versions 2>/dev/null | grep -qi 'adom.adom-agent-bar@'"
 log "  adom-agent-bar extension baked ($(basename "$AGENT_BAR_VSIX"))"
+# Keep the bar alive with NO editor open: VS Code only builds editor/title
+# actions for a group with an active editor, so the row vanished when the
+# last tab closed (Kyle 2026-09-02: "i want them to stay open"). The script
+# (same file Hydrogen bundles and re-applies at launch, so the two never
+# drift) rewrites that branch of workbench.js and bumps product.json's
+# `commit` + the client's baked copy in lockstep — code-server serves the
+# bundle under /stable-<commit>/ with a 1y max-age, so the bump is what makes
+# already-loaded clients fetch the patched file. NOMATCH = code-server
+# upgrade changed the minified shape → fail the bake, refresh the regex.
+WB=/usr/lib/code-server/lib/vscode/out/vs/code/browser/workbench/workbench.js
+PATCH_OUT="$(/usr/lib/code-server/lib/node /tmp/adom-agent-bar/patch-empty-group-actions.cjs "$WB" 2>&1)" \
+  || { echo "bake: empty-group editor-actions patch failed: $PATCH_OUT" >&2; exit 1; }
+grep -q hydrogenEmptyGroupEditorActions "$WB" || { echo "bake: workbench.js lacks the empty-group marker" >&2; exit 1; }
+rm -f "$WB.orig"   # pristine copy is pointless in an image (11 MB); Hydrogen's launch ensure keeps one on live machines
+rm -rf /tmp/adom-agent-bar
+log "  empty-group editor-actions patch: $(echo "$PATCH_OUT" | tr '\n' ' ')"
 
 # ── step 3: install-adom-vscode (extension half; binary baked earlier) ────
 # `adom-vscode install` drops the .vsix at /tmp + skill + completions but

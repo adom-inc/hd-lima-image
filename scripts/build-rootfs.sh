@@ -176,7 +176,8 @@ fi
 # built from hydrogen-macos/vscode-agent-bar/build.sh) — staged for bake step 16d.
 sudo rm -rf "${ROOT}/tmp/adom-agent-bar"
 sudo mkdir -p "${ROOT}/tmp/adom-agent-bar"
-sudo install -m 0644 "$(dirname "$0")"/../image/adom-agent-bar/adom-agent-bar-*.vsix "${ROOT}/tmp/adom-agent-bar/"
+sudo install -m 0644 "$(dirname "$0")"/../image/adom-agent-bar/adom-agent-bar-*.vsix \
+  "$(dirname "$0")"/../image/adom-agent-bar/patch-empty-group-actions.cjs "${ROOT}/tmp/adom-agent-bar/"
 
 # adom-wiki CLI (native arm64; the official wiki package manager — adompkg is
 # RETIRED) — staged for the adom-wiki step in bake-hydrogen-setup.sh. Source: the same
@@ -341,6 +342,10 @@ in_root "set -e; code-server --version; node --version; git --version; \
       | grep -qi 'adom.adom-agent-bar' || { echo 'MISSING adom-agent-bar extension (v25)'; exit 1; }; \
   jq -e '.["workbench.editor.editorActionsLocation"] == "titleBar"' /home/adom/.local/share/code-server/User/settings.json >/dev/null \
       || { echo 'settings.json lacks editorActionsLocation=titleBar (agent bar would sit in the tab strip)'; exit 1; }; \
+  grep -q hydrogenEmptyGroupEditorActions /usr/lib/code-server/lib/vscode/out/vs/code/browser/workbench/workbench.js \
+      || { echo 'workbench.js lacks the empty-group editor-actions patch (agent bar would hide with no tabs open)'; exit 1; }; \
+  jq -e '.hydrogenCacheBust == 1 and (.commit != .hydrogenOrigCommit)' /usr/lib/code-server/lib/vscode/product.json >/dev/null \
+      || { echo 'product.json commit not cache-busted (clients would keep the unpatched workbench.js)'; exit 1; }; \
   test -L /home/adom/.gemini/bin/agy && test -x /home/adom/.gemini/bin/agy \
       || { echo 'MISSING ~/.gemini/bin/agy symlink (antigravity ext would re-download its backend)'; exit 1; }; \
   test -x /usr/bin/gnome-keyring-daemon && test -x /usr/bin/secret-tool || { echo 'MISSING gnome-keyring/libsecret-tools'; exit 1; }; \

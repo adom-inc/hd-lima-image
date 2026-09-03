@@ -163,7 +163,7 @@ USER root
 # adom-bridge/adom-bridge (built from adom-inc/bridge-macos cli/); the wiki
 # no longer publishes a Linux CLI, so step 10 hard-requires this staging.
 COPY adom-bridge/ /tmp/adom-bridge/
-# Adom Agent Bar extension vsix (ours, checked in) — bake step 16d.
+# Adom Agent Bar extension vsix + workbench.js patch script (ours, checked in) — bake step 16d.
 COPY adom-agent-bar/ /tmp/adom-agent-bar/
 COPY bake-hydrogen-setup.sh /tmp/bake-hydrogen-setup.sh
 RUN bash /tmp/bake-hydrogen-setup.sh && rm -f /tmp/bake-hydrogen-setup.sh
