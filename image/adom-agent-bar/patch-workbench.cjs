@@ -1,12 +1,27 @@
-// hydrogen: keep `editor/title` actions in the title bar when NO editor is open.
+// hydrogen: the launch-time rewrites of code-server's minified workbench.js.
 //
-// VS Code's EditorGroupView.createEditorActions() builds the editor/title menu
-// only when the group has an active editor pane; an empty group returns nothing,
-// so with workbench.editor.editorActionsLocation=titleBar the agent-bar buttons
-// (docs/features/ui/agent-bar.md) vanish the moment the last tab closes. This
-// patches the minified workbench.js so the empty-group branch builds the SAME
-// menu against the group's own scoped context instead (and still re-fires when
-// an editor opens). Idempotent (marker) and self-verifying; keeps a .orig.
+//   1. editorActions — keep `editor/title` actions in the title bar when NO editor
+//      is open. VS Code's EditorGroupView.createEditorActions() builds the
+//      editor/title menu only when the group has an active editor pane; an empty
+//      group returns nothing, so with workbench.editor.editorActionsLocation=titleBar
+//      the agent-bar buttons (docs/features/ui/agent-bar.md) vanish the moment the
+//      last tab closes. The empty-group branch is rewritten to build the SAME menu
+//      against the group's own scoped context (and still re-fire when an editor
+//      opens).
+//   2. swStartup — never let startup hang on the PWA service worker. code-server's
+//      CodeServerClient.startup() does `await navigator.serviceWorker.register(...)`
+//      and only AFTER it returns does web.main create VS Code's BrowserWindow
+//      contribution — the object that owns `window resize → layout()` (plus the
+//      wheel/contextmenu/drop guards and the multi-window setTimeout shim). In
+//      Hydrogen's WKWebView that register() can wedge forever (a /__cs/ registration
+//      stuck in `installing`; every later register/unregister for the scope queues
+//      behind it, and it survives app restarts) — the workbench then renders and
+//      works but never re-lays out: "code-server doesn't resize" on fresh installs
+//      (docs/features/workspace/embedded-editor.md, Kyle 2026-09-03). The await is
+//      raced against a 3 s timer; the SW (PWA-only, a no-op fetch handler) still
+//      registers in the background when it can.
+//
+// Idempotent (markers) and self-verifying; keeps a .orig of the pristine file.
 //
 // Cache bust: code-server serves workbench.js under /stable-<commit>/static/
 // with max-age=1y and no ETag, so a patched file would never reach a client
@@ -18,11 +33,12 @@
 // patch output changes; product.json remembers the generation and the pristine
 // commit (`hydrogenCacheBust`, `hydrogenOrigCommit`).
 //
-// usage: node patch-empty-group-actions.cjs <workbench.js> [<product.json>]
+// usage: node patch-workbench.cjs <workbench.js> [<product.json>]
 // prints one line per step (already | CHANGED | NOMATCH) then a summary line:
 //   CHANGED   — something was rewritten (restart code-server)
 //   already   — nothing to do
-//   NOMATCH   — code-server build no longer fits the regex/literal (exit 2)
+//   NOMATCH   — code-server build no longer fits a regex/literal (exit 2; the
+//               steps that did match are still written)
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -30,7 +46,8 @@ const crypto = require('crypto');
 const file = process.argv[2];
 const productFile = process.argv[3] || path.resolve(path.dirname(file), '../../../../../product.json');
 const MARK = '/*hydrogenEmptyGroupEditorActions*/';
-const BUST = 1;
+const MARK_SW = '/*hydrogenSwStartupRace*/';
+const BUST = 2; // 1 = editorActions; 2 = + swStartup
 let src = fs.readFileSync(file, 'utf8');
 const orig = src;
 let nomatch = false;
@@ -72,7 +89,26 @@ if (src.includes(MARK)) {
   }
 }
 
-// --- 2. cache bust (product.json + baked client literal, in lockstep) ---------
+// --- 2. service-worker startup race -------------------------------------------
+// code-server's CodeServerClient.startup() ends with
+//   this.c.serviceWorker&&await this.j(this.c.serviceWorker)
+// (`j` = navigator.serviceWorker.register wrapped in try/catch). Both member
+// names are captured; the config member must be the same on both sides.
+if (src.includes(MARK_SW)) {
+  console.log('swStartup: already');
+} else {
+  const re = /this\.(\w+)\.serviceWorker&&await this\.(\w+)\(this\.\1\.serviceWorker\)/g;
+  const hits = src.match(re) || [];
+  if (hits.length !== 1) {
+    console.log(`swStartup: NOMATCH (${hits.length} sites)`); nomatch = true;
+  } else {
+    src = src.replace(re, (whole, cfg, fn) =>
+      `${MARK_SW}this.${cfg}.serviceWorker&&await Promise.race([this.${fn}(this.${cfg}.serviceWorker),new Promise(r=>setTimeout(r,3e3))])`);
+    console.log('swStartup: CHANGED');
+  }
+}
+
+// --- 3. cache bust (product.json + baked client literal, in lockstep) ---------
 const product = JSON.parse(fs.readFileSync(productFile, 'utf8'));
 if (product.hydrogenCacheBust === BUST) {
   console.log('cacheBust: already');
@@ -95,8 +131,12 @@ if (product.hydrogenCacheBust === BUST) {
   }
 }
 
-if (nomatch) { console.log('NOMATCH'); process.exit(2); }
-if (src === orig) { console.log('already'); process.exit(0); }
-if (!fs.existsSync(file + '.orig')) fs.copyFileSync(file, file + '.orig');
-fs.writeFileSync(file, src);
-console.log('CHANGED');
+if (src !== orig) {
+  if (!fs.existsSync(file + '.orig')) fs.copyFileSync(file, file + '.orig');
+  fs.writeFileSync(file, src);
+}
+// Summary line LAST so callers can key on it; NOMATCH (exit 2) still reports
+// CHANGED when another step wrote (the caller must restart code-server then too).
+if (nomatch) console.log('NOMATCH');
+console.log(src === orig ? 'already' : 'CHANGED');
+process.exit(nomatch ? 2 : 0);

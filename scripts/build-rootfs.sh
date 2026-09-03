@@ -177,7 +177,7 @@ fi
 sudo rm -rf "${ROOT}/tmp/adom-agent-bar"
 sudo mkdir -p "${ROOT}/tmp/adom-agent-bar"
 sudo install -m 0644 "$(dirname "$0")"/../image/adom-agent-bar/adom-agent-bar-*.vsix \
-  "$(dirname "$0")"/../image/adom-agent-bar/patch-empty-group-actions.cjs "${ROOT}/tmp/adom-agent-bar/"
+  "$(dirname "$0")"/../image/adom-agent-bar/patch-workbench.cjs "${ROOT}/tmp/adom-agent-bar/"
 
 # adom-wiki CLI (native arm64; the official wiki package manager — adompkg is
 # RETIRED) — staged for the adom-wiki step in bake-hydrogen-setup.sh. Source: the same
