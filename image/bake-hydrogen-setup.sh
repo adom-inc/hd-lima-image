@@ -292,6 +292,21 @@ grep -q hydrogenSwStartupRace "$WB" || { echo "bake: workbench.js lacks the serv
 rm -f "$WB.orig"   # pristine copy is pointless in an image (11 MB); Hydrogen's launch ensure keeps one on live machines
 rm -rf /tmp/adom-agent-bar
 log "  workbench patch: $(echo "$PATCH_OUT" | tr '\n' ' ')"
+# CSP: code-server's page policy is `connect-src 'self' ws: wss: https:` (a literal in
+# server-main.js) — Hydrogen's workbench script (clean_activity_bar, runtime/macos.rs)
+# must reach the host control API over plain http on loopback to follow Claude
+# sign-in. Widen to loopback-any-port; mirrors the launch-time ensure exactly.
+SM=/usr/lib/code-server/lib/vscode/out/server-main.js
+python3 - "$SM" <<'PY' || { echo "bake: server-main.js CSP literal not found" >&2; exit 1; }
+import sys
+p=sys.argv[1]; s=open(p).read()
+a="connect-src 'self' ws: wss: https:;"; b="connect-src 'self' ws: wss: https: http://127.0.0.1:* http://localhost:*;"
+if b in s: sys.exit(0)
+if a not in s: sys.exit(1)
+open(p,'w').write(s.replace(a,b,1))
+PY
+grep -qF "http://127.0.0.1:* http://localhost:*" "$SM" || { echo "bake: CSP widen did not apply" >&2; exit 1; }
+log "  csp: connect-src widened to loopback http"
 
 # ── step 3: install-adom-vscode (extension half; binary baked earlier) ────
 # `adom-vscode install` drops the .vsix at /tmp + skill + completions but
