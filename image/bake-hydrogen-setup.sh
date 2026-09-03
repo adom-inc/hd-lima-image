@@ -363,7 +363,9 @@ chown adom:adom /home/adom/.config/code-server/config.yaml
 # IndexedDB state:
 #   1. trusted domains "*" — suppresses the 'open external website?' dialog
 #      (same as the cascade's patch)
-#   2. activity bar: unpin Search/SCM/Run-and-Debug via
+#   2. activity bar: unpin Search/SCM/Run-and-Debug + the four agent
+#      sidebars (Claude sessions, Codex, Kimi, Antigravity — Kyle 2026-09-03:
+#      agents live in tabs via the agent bar, not the sidebar) via
 #      workbench.activity.pinnedViewlets2 — replaces the cascade's
 #      interactive :8821 hide-activitybar step. Seeded ONCE per profile
 #      (adom.activityBarSeeded marker) so a user who deliberately re-pins
@@ -382,7 +384,7 @@ SCRIPT = ('<script>(function(){try{var r=indexedDB.open("vscode-web-state-db-glo
  'var sg=os1.get("adom.activityBarSeeded");sg.onsuccess=function(){if(sg.result)return;'
  'var pg=os1.get("workbench.activity.pinnedViewlets2");pg.onsuccess=function(){'
  'var arr=[];try{if(pg.result)arr=JSON.parse(pg.result)}catch(_){}'
- 'var ids=["workbench.view.search","workbench.view.scm","workbench.view.debug"];'
+ 'var ids=["workbench.view.search","workbench.view.scm","workbench.view.debug","workbench.view.extension.claude-sessions-sidebar","workbench.view.extension.codexViewContainer","workbench.view.extension.kimi-sidebar","workbench.view.extension.antigravity-sidebar"];'
  'ids.forEach(function(id){var f=null;for(var i=0;i<arr.length;i++){if(arr[i].id===id)f=arr[i]}'
  'if(f){f.pinned=false}else{arr.push({id:id,pinned:false,visible:false})}});'
  'try{var t2=d.transaction("ItemTable","readwrite");var o2=t2.objectStore("ItemTable");'
